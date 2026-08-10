@@ -4,7 +4,7 @@
 
 ## 1. 一句话当前进度
 
-系统已完成阶段 0-10（脚手架、数据库、认证、权限、系统管理、器材基础、库存入库、借用归还、报废、统计分析），后端 **35 个集成测试全绿**，前端构建通过；下一步是**阶段 11：联调优化与上线**。
+系统已完成阶段 0-11（脚手架、数据库、认证、权限、系统管理、器材基础、库存入库、借用归还、报废、统计分析、本地联调加固），后端 **35 个集成测试全绿**，前端构建通过，本地冒烟测试全通过；**暂不部署上线**，后续按需迭代维护。
 
 ## 2. 环境基线（重要）
 
@@ -21,17 +21,17 @@
 
 ## 3. Git 状态
 
-develop 分支（worktree）已有 13 个提交，最近 5 个：
+develop 分支（worktree）已有 14 个提交，最近 5 个：
 
 ```text
+7036697 feat: 本地联调加固（JWT环境变量/参数校验/报表索引/冒烟脚本）（commit 13）
 c4df795 feat: 统计分析模块（仪表盘汇总/报表图表/Excel导出）（commit 12）
 255c006 feat: 报废管理模块（申请/审核/处置出库）（commit 11）
 c77ff8d feat: 借用归还模块（库存锁定/领用/归还回补/逾期违约金）（commit 10）
 361b154 feat: 库存与入库模块（库存/流水/预警/调整、入库单全流程）（commit 9）
-35262a2 feat: 器材基础资料模块（分类/器材档案/仓库、自动编码、Excel导入导出）（commit 8）
 ```
 
-约定：commit 编号与主计划对应（commit 13=联调上线，tag v1.0.0）。全部工作提交在 develop；main 只接受 release 合并。
+约定：commit 编号与主计划对应；阶段 11 按用户要求仅做本地联调加固（未上线、未打 tag v1.0.0）。全部工作提交在 develop；main 只接受 release 合并。
 
 ## 4. 架构速览
 
@@ -64,9 +64,14 @@ npm run build
 4. 前端：`dashboard/index.vue`（替换占位页：7 张汇总卡片 + 4 张 ECharts 图）、`statistics/index.vue`（报表页：时间筛选、趋势/排行图、部门表、逾期统计卡与明细表、导出下拉）。
 5. 聚合 SQL 位于 `resources/mapper/StatisticMapper.xml`；集成测试 `StatisticTest`（3 个用例，共 35 个全绿）。
 
-## 7. 下一步：阶段 11 联调优化与上线
+## 7. 阶段 11 本地联调加固（已完成，commit 13；未上线）
 
-安全加固（生产密钥环境变量、参数校验复查）、性能检查、Docker/部署脚本、冒烟测试、tag v1.0.0（commit 13）。
+1. **安全加固**：JWT secret/有效期支持环境变量覆盖（`JWT_SECRET`/`JWT_EXPIRATION`，开发缺省值不变）；参数校验复查补充 `ReturnItemDTO.penaltyAmount`、`StockInItemDTO.unitPrice` 非负校验（其余 DTO 校验覆盖完整，控制器 `@Valid` 全覆盖）。
+2. **性能索引**：新增 Flyway V3 `V3__optimize_indexes.sql`：借用单 issue_time/create_time、借用明细 (status, issued_quantity)、归还单 confirm_time/create_time、入库单/报废单 create_time、库存流水 (change_type, create_time)。
+3. **冒烟脚本**：`scripts/smoke-test.ps1`（UTF-8 BOM）：健康检查 → 验证码登录（redis-cli 取码）→ 仪表盘/统计报表/业务列表 → 未认证 401。已验证全通过；前端 dev server（5173）代理 `/api → 8080` 联通。
+4. **文档**：README 更新为本地运行指南。
+
+> 后续若需要上线：再补 Docker/部署脚本、生产 profile、tag v1.0.0（原 commit 13 内容拆为新的独立提交）。
 
 ## 8. 已知注意事项（踩过的坑）
 
@@ -80,7 +85,8 @@ npm run build
 8. **数据库已是迁移后状态**：修改表结构必须新增 Flyway 版本（V3），不要改 V1/V2。
 9. **测试数据清理**：集成测试用 finally 物理清理（JdbcTemplate），避免残留导致断言失败。
 10. **中文编码**：PowerShell 控制台显示乱码是 GBK 显示问题，文件本身 UTF-8 正常；不要据此误判文件损坏。
+11. **PowerShell 脚本中文解析**：`.ps1` 必须保存为 **UTF-8 with BOM**，否则 Windows PowerShell 按 ANSI 解析中文报语法错误（本次 smoke-test.ps1 已踩过）。
 
 ## 9. 新会话启动语（建议）
 
-> 请读取 `docs/handoff.md`，然后在 develop 分支（worktree 路径见文档）按第 6 节继续实现阶段 10 统计分析模块，完成后提交 commit 12。
+> 请读取 `docs/handoff.md`，然后在 develop 分支（worktree 路径见文档）继续维护：本地启动后端+前端后执行 `.\scripts\smoke-test.ps1` 冒烟；有迭代需求时按阶段计划推进。
