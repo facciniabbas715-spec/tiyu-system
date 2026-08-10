@@ -93,7 +93,29 @@ npm run build
 - **深链/刷新 404**：守卫重定向时把 404 路由的 `name` 一并带回，导致首次直达菜单页（或刷新）仍解析到 404。修复：`guard.ts` 重定向只按 path/query/hash 重新导航。
 - **验证**：Playwright 实测 `/monitor/loginlog`、`/scrap/scrap` 均只剩 1 套侧边栏、1 处标题；直接刷新菜单页不再 404；前端 type-check/build 通过。
 
-## 8. 已知注意事项（踩过的坑）
+### 7.4 数据权限（commit 17）
+
+- **机制**：`DataScopeService` 按当前用户角色 `data_scope`（1全部/2本部门/3本部门及以下/4仅本人）计算可见范围；内置 `admin` 角色恒为全部，多角色取最宽（最小 scope）。
+- **落点**：借用单、归还单、用户管理三处列表查询自动过滤；借用/归还的详情与操作（审核/发放/续借/取消/确认/驳回）、用户详情做访问校验（越权返回 403）。
+- **角色管理**：角色新增/编辑支持设置数据范围（RoleDTO/RoleVO + 前端下拉），角色列表展示数据范围列。
+- **边界**：器材/仓库/入库/报废/统计无部门语义，暂不参与数据范围过滤（文档化决定）。
+- **测试**：`DataScopeTest` 3 个用例（本部门、仅本人、角色 dataScope 返回），全量 43/43 通过。
+
+## 8. 中危项处理清单（交给新对话窗口）
+
+> 用户已要求：在新对话窗口处理以下中危项。新窗口请先读取本文件，然后按清单逐项实现、补测试、提交。
+
+1. **删除/重置密码/改角色后旧会话仍有效**：`SysUserServiceImpl.remove/resetPassword/update` 应调用现有 `kickUserSessions`（目前仅 `changeStatus` 停用时踢会话）；角色/权限变更后可考虑全量踢出或缩短缓存。
+2. **器材删除无业务校验**：`EquipmentServiceImpl.remove` 未使用已有 `EQUIPMENT_IN_USE`；应校验无库存（quantity+locked>0）、无未完结借用/报废后允许删除。
+3. **仓库删除无校验**：`WarehouseServiceImpl.remove` 直接删除；应校验 `equipment_stock`、入库/归还/报废单无引用。
+4. **内置 admin 角色可被修改/清空菜单**：`SysRoleServiceImpl.update/assignMenus` 对 id=1 应禁止改 roleKey/status 与清空核心菜单。
+5. **菜单可成环**：`SysMenuServiceImpl.update` 仅防“父=自己”，需沿祖先链校验新父级不是自身后代，避免 `routers()` 递归栈溢出。
+6. **借用分页按借用人过滤不准**：`BorrowServiceImpl.page` 用内存过滤且 total 不准确，应改为 SQL 联查 sys_user。
+7. **列表 N+1 查询**：stock/borrow/return/scrap/equipment 的 VO 组装逐行查关联表，改用 `selectBatchIds` 批量查询。
+
+每项建议：先写/补集成测试再改代码（参考 `DataScopeTest`、`BorrowReturnTest` 模式），最后全量 `.\mvnw.cmd test` + 前端 `npm run type-check && npm run build`。
+
+## 9. 已知注意事项（踩过的坑）
 
 1. **不要用子代理协作**：本会话子代理消息投递机制故障（任务消息丢失、子代理偏离任务），后续全部**内联执行**。
 2. **本机 shell 策略**：`Remove-Item`、`Start-Process`（含 cmd 包装）会被拦截；删除文件用 `apply_patch`，后台启动进程用 `.NET ProcessStartInfo`（`UseShellExecute=false, CreateNoWindow=true`，环境变量用 `$psi.Environment["JAVA_HOME"]=...`）。
@@ -107,6 +129,6 @@ npm run build
 10. **中文编码**：PowerShell 控制台显示乱码是 GBK 显示问题，文件本身 UTF-8 正常；不要据此误判文件损坏。
 11. **PowerShell 脚本中文解析**：`.ps1` 必须保存为 **UTF-8 with BOM**，否则 Windows PowerShell 按 ANSI 解析中文报语法错误（本次 smoke-test.ps1 已踩过）。
 
-## 9. 新会话启动语（建议）
+## 10. 新会话启动语（建议）
 
-> 请读取 `docs/handoff.md`，然后在 develop 分支（worktree 路径见文档）继续维护：本地启动后端+前端后执行 `.\scripts\smoke-test.ps1` 冒烟；有迭代需求时按阶段计划推进。
+> 请读取 `docs/handoff.md`，然后在 develop 分支（worktree 路径见文档）按第 8 节清单处理中危项：逐项补测试、实现、提交；本地启动后端+前端后执行 `.\scripts\smoke-test.ps1` 冒烟。
