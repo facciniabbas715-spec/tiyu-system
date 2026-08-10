@@ -73,6 +73,13 @@ npm run build
 
 > 后续若需要上线：再补 Docker/部署脚本、生产 profile、tag v1.0.0（原 commit 13 内容拆为新的独立提交）。
 
+### 7.1 阶段 11 后维护（commit 14）
+
+- **修复**：LogAspect 序列化参数时过滤 `ServletRequest/ServletResponse/OutputStream/Writer`，导出接口不再把 Excel 二进制写入 `sys_oper_log.oper_param`（回归测试 `StatisticTest.exportLog_shouldSkipServletResponse`）。
+- **前端**：报表导出文件名由类型码改为中文标签。
+- **冒烟脚本**：新增 Excel 导出检查（`-OutFile` 下载 + PK 头校验）。
+- **本地运维脚本**：`scripts/backup-db.ps1`（mysqldump 单事务备份到 `backups/`，已 gitignore）、`scripts/start-backend.ps1`（隐藏窗口后台启动后端）。
+
 ## 8. 已知注意事项（踩过的坑）
 
 1. **不要用子代理协作**：本会话子代理消息投递机制故障（任务消息丢失、子代理偏离任务），后续全部**内联执行**。
