@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -70,10 +71,35 @@ public class SysMenuServiceImpl implements SysMenuService {
         if (dto.getId().equals(dto.getParentId())) {
             throw new BizException(ErrorCode.PARAM_ERROR, "父菜单不能是自己");
         }
+        validateNoCycle(dto.getId(), dto.getParentId());
         SysMenu menu = new SysMenu();
         menu.setId(dto.getId());
         applyMenuFields(menu, dto);
         menuMapper.updateById(menu);
+    }
+
+    /**
+     * 沿新父级祖先链校验，禁止把菜单挂到自身子孙下，避免树成环导致 routers() 栈溢出。
+     */
+    private void validateNoCycle(Long menuId, Long parentId) {
+        if (parentId == null || parentId == 0) {
+            return;
+        }
+        Long cursor = parentId;
+        Set<Long> visited = new HashSet<>();
+        while (cursor != null && cursor != 0) {
+            if (cursor.equals(menuId)) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "父菜单不能是自身或其子菜单");
+            }
+            if (!visited.add(cursor)) {
+                break;
+            }
+            SysMenu parent = menuMapper.selectById(cursor);
+            if (parent == null) {
+                break;
+            }
+            cursor = parent.getParentId();
+        }
     }
 
     @Override
