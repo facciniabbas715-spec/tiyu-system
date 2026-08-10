@@ -28,11 +28,16 @@ logs/
 *.log
 temp/
 *.tmp
+backups/
+output/
+.playwright-cli/
 
 # ---------- Environment / Secrets ----------
 .env
 .env.*
 !.env.example
+!.env.development
+!.env.production
 application-local.yml
 application-prod.yml
 
