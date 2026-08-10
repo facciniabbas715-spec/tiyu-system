@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -177,6 +178,72 @@ class StockTest {
         }
     }
 
+    @Test
+    void adjustNegative_shouldNotConsumeLockedStock() throws Exception {
+        String token = loginAdmin();
+        try {
+            long[] ids = prepareBase(token);
+            mockMvc.perform(put("/api/stock/adjust")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of(
+                                    "equipmentId", ids[0],
+                                    "warehouseId", ids[1],
+                                    "changeQuantity", 10))))
+                    .andExpect(jsonPath("$.code").value(0));
+            // 借用申请锁定 6 件（可用仅 4 件）
+            mockMvc.perform(post("/api/borrow")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of(
+                                    "borrowType", 1,
+                                    "purpose", "库存测试锁定借用",
+                                    "expectedReturnDate", LocalDate.now().plusDays(7).toString(),
+                                    "items", List.of(Map.of(
+                                            "equipmentId", ids[0],
+                                            "warehouseId", ids[1],
+                                            "quantity", 6))))))
+                    .andExpect(jsonPath("$.code").value(0));
+            mockMvc.perform(get("/api/stock/page")
+                            .header("Authorization", "Bearer " + token)
+                            .param("equipmentName", TEST_EQUIPMENT))
+                    .andExpect(jsonPath("$.data.records[0].quantity").value(10))
+                    .andExpect(jsonPath("$.data.records[0].lockedQuantity").value(6));
+
+            // 盘亏 5 件超过可用 4 件，必须被拦截
+            mockMvc.perform(put("/api/stock/adjust")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of(
+                                    "equipmentId", ids[0],
+                                    "warehouseId", ids[1],
+                                    "changeQuantity", -5))))
+                    .andExpect(jsonPath("$.code").value(3001));
+            mockMvc.perform(get("/api/stock/page")
+                            .header("Authorization", "Bearer " + token)
+                            .param("equipmentName", TEST_EQUIPMENT))
+                    .andExpect(jsonPath("$.data.records[0].quantity").value(10))
+                    .andExpect(jsonPath("$.data.records[0].lockedQuantity").value(6));
+
+            // 盘亏 3 件在可用范围内，允许
+            mockMvc.perform(put("/api/stock/adjust")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of(
+                                    "equipmentId", ids[0],
+                                    "warehouseId", ids[1],
+                                    "changeQuantity", -3))))
+                    .andExpect(jsonPath("$.code").value(0));
+            mockMvc.perform(get("/api/stock/page")
+                            .header("Authorization", "Bearer " + token)
+                            .param("equipmentName", TEST_EQUIPMENT))
+                    .andExpect(jsonPath("$.data.records[0].quantity").value(7))
+                    .andExpect(jsonPath("$.data.records[0].lockedQuantity").value(6));
+        } finally {
+            cleanup();
+        }
+    }
+
     private long[] prepareBase(String token) throws Exception {
         return prepareBase(token, 0);
     }
@@ -235,6 +302,9 @@ class StockTest {
     }
 
     private void cleanup() {
+        jdbcTemplate.update("DELETE FROM borrow_item WHERE borrow_id IN " +
+                "(SELECT id FROM borrow_order WHERE purpose = '库存测试锁定借用')");
+        jdbcTemplate.update("DELETE FROM borrow_order WHERE purpose = '库存测试锁定借用'");
         jdbcTemplate.update("DELETE FROM stock_record");
         jdbcTemplate.update("DELETE FROM stock_in_item");
         jdbcTemplate.update("DELETE FROM stock_in_order");

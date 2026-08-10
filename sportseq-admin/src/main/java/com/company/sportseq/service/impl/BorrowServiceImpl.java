@@ -159,6 +159,10 @@ public class BorrowServiceImpl implements BorrowService {
         List<BorrowItem> items = loadItems(order.getId());
         for (BorrowItem item : items) {
             var stock = stockMapper.selectForUpdate(item.getEquipmentId(), item.getWarehouseId());
+            if (stock == null || stock.getQuantity() < item.getQuantity()
+                    || stock.getLockedQuantity() < item.getQuantity()) {
+                throw new BizException(ErrorCode.STOCK_NOT_ENOUGH, "器材库存不足，无法发放");
+            }
             int before = stock == null ? 0 : stock.getQuantity();
             int affected = stockMapper.subtractQuantity(item.getEquipmentId(), item.getWarehouseId(),
                     item.getQuantity(), userId);

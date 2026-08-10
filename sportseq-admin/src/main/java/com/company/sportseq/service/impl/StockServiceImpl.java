@@ -103,7 +103,7 @@ public class StockServiceImpl implements StockService {
             stockMapper.addQuantity(dto.getEquipmentId(), dto.getWarehouseId(),
                     dto.getChangeQuantity(), userId);
         } else {
-            int affected = stockMapper.subtractQuantity(dto.getEquipmentId(), dto.getWarehouseId(),
+            int affected = stockMapper.subtractAvailableQuantity(dto.getEquipmentId(), dto.getWarehouseId(),
                     -dto.getChangeQuantity(), userId);
             if (affected == 0) {
                 throw new BizException(ErrorCode.STOCK_NOT_ENOUGH);

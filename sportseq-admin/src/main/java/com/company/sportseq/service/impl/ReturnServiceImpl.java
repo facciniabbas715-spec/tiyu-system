@@ -40,7 +40,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -89,6 +91,7 @@ public class ReturnServiceImpl implements ReturnService {
         if (borrowOrder.getStatus() != 2 && borrowOrder.getStatus() != 3 && borrowOrder.getStatus() != 4) {
             throw new BizException(ErrorCode.ORDER_STATUS_ERROR, "当前借用单状态不允许归还");
         }
+        validateReturnQuantities(dto);
         Long userId = SecurityUtils.getUserId();
         ReturnItemDTO first = dto.getItems().get(0);
         BorrowItem firstBorrowItem = borrowItemMapper.selectById(first.getBorrowItemId());
@@ -138,6 +141,26 @@ public class ReturnServiceImpl implements ReturnService {
         returnItemMapper.insert(item);
     }
 
+    /**
+     * 归还登记前置校验：同一借用明细多条归还行合并校验，防止超量登记。
+     */
+    private void validateReturnQuantities(ReturnOrderDTO dto) {
+        Map<Long, Integer> quantityByItem = new HashMap<>();
+        for (ReturnItemDTO itemDto : dto.getItems()) {
+            quantityByItem.merge(itemDto.getBorrowItemId(), itemDto.getQuantity(), Integer::sum);
+        }
+        for (Map.Entry<Long, Integer> entry : quantityByItem.entrySet()) {
+            BorrowItem borrowItem = borrowItemMapper.selectById(entry.getKey());
+            if (borrowItem == null || !borrowItem.getBorrowId().equals(dto.getBorrowOrderId())) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "归还明细不属于该借用单");
+            }
+            int unreturned = borrowItem.getQuantity() - borrowItem.getReturnedQuantity();
+            if (entry.getValue() > unreturned) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "归还数量超过未还数量");
+            }
+        }
+    }
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void confirm(Long id) {
@@ -151,7 +174,15 @@ public class ReturnServiceImpl implements ReturnService {
         List<ReturnItem> items = returnItemMapper.selectList(
                 Wrappers.<ReturnItem>lambdaQuery().eq(ReturnItem::getReturnId, order.getId()));
         for (ReturnItem item : items) {
-            BorrowItem borrowItem = borrowItemMapper.selectById(item.getBorrowItemId());
+            BorrowItem borrowItem = borrowItemMapper.selectForUpdate(item.getBorrowItemId());
+            if (borrowItem == null) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "借用明细不存在");
+            }
+            int remaining = borrowItem.getQuantity() - borrowItem.getReturnedQuantity();
+            if (item.getQuantity() > remaining) {
+                throw new BizException(ErrorCode.PARAM_ERROR,
+                        "归还数量超过未还数量（未还 " + remaining + "）");
+            }
             int before = getQuantity(borrowItem.getEquipmentId(), order.getWarehouseId());
             stockMapper.addQuantity(borrowItem.getEquipmentId(), order.getWarehouseId(),
                     item.getQuantity(), userId);

@@ -136,10 +136,10 @@ public class ScrapServiceImpl implements ScrapService {
         for (ScrapItem item : items) {
             var stock = stockMapper.selectForUpdate(item.getEquipmentId(), order.getWarehouseId());
             int before = stock == null ? 0 : stock.getQuantity();
-            int affected = stockMapper.subtractQuantity(item.getEquipmentId(), order.getWarehouseId(),
+            int affected = stockMapper.subtractAvailableQuantity(item.getEquipmentId(), order.getWarehouseId(),
                     item.getQuantity(), userId);
             if (affected == 0) {
-                throw new BizException(ErrorCode.STOCK_NOT_ENOUGH, "库存不足，无法完成报废处置");
+                throw new BizException(ErrorCode.STOCK_NOT_ENOUGH, "可用库存不足，无法完成报废处置");
             }
             StockRecord record = new StockRecord();
             record.setEquipmentId(item.getEquipmentId());

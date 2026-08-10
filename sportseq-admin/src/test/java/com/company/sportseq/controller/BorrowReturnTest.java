@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MvcResult;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -167,6 +168,180 @@ class BorrowReturnTest {
         }
     }
 
+    @Test
+    void duplicateReturn_shouldBeRejectedAndStockUnchanged() throws Exception {
+        String token = loginAdmin();
+        try {
+            long[] ids = prepareBase(token, 10);
+            long orderId = createBorrow(token, ids, 3);
+            mockMvc.perform(put("/api/borrow/audit")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of("orderId", orderId, "pass", true))))
+                    .andExpect(jsonPath("$.code").value(0));
+            mockMvc.perform(put("/api/borrow/" + orderId + "/issue")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(jsonPath("$.code").value(0));
+            Long borrowItemId = borrowItemId(token, orderId);
+
+            // 两张待确认归还单，各登记全额 3 件（单张校验均能通过）
+            mockMvc.perform(post("/api/return")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(returnBody(orderId, borrowItemId, 3)))
+                    .andExpect(jsonPath("$.code").value(0));
+            mockMvc.perform(post("/api/return")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(returnBody(orderId, borrowItemId, 3)))
+                    .andExpect(jsonPath("$.code").value(0));
+
+            List<Long> returnIds = pendingReturnIds(token, orderId);
+            if (returnIds.size() < 2) {
+                throw new AssertionError("应存在两张待确认归还单");
+            }
+            mockMvc.perform(put("/api/return/" + returnIds.get(0) + "/confirm")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(jsonPath("$.code").value(0));
+            // 第二张确认必须被拦截：未还数量已为 0
+            mockMvc.perform(put("/api/return/" + returnIds.get(1) + "/confirm")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(jsonPath("$.code").value(1001));
+
+            mockMvc.perform(get("/api/stock/page")
+                            .header("Authorization", "Bearer " + token)
+                            .param("equipmentName", TEST_EQUIPMENT))
+                    .andExpect(jsonPath("$.data.records[0].quantity").value(10))
+                    .andExpect(jsonPath("$.data.records[0].lockedQuantity").value(0));
+            mockMvc.perform(get("/api/borrow/" + orderId)
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(jsonPath("$.data.status").value(4))
+                    .andExpect(jsonPath("$.data.items[0].returnedQuantity").value(3));
+        } finally {
+            cleanup();
+        }
+    }
+
+    @Test
+    void returnOrderWithDuplicateLines_shouldBeRejected() throws Exception {
+        String token = loginAdmin();
+        try {
+            long[] ids = prepareBase(token, 10);
+            long orderId = createBorrow(token, ids, 3);
+            mockMvc.perform(put("/api/borrow/audit")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of("orderId", orderId, "pass", true))))
+                    .andExpect(jsonPath("$.code").value(0));
+            mockMvc.perform(put("/api/borrow/" + orderId + "/issue")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(jsonPath("$.code").value(0));
+            Long borrowItemId = borrowItemId(token, orderId);
+
+            // 同一归还单中两条相同明细，合计 4 > 未还 3
+            mockMvc.perform(post("/api/return")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of(
+                                    "borrowOrderId", orderId,
+                                    "items", List.of(
+                                            Map.of("borrowItemId", borrowItemId, "quantity", 2, "conditionStatus", 1),
+                                            Map.of("borrowItemId", borrowItemId, "quantity", 2, "conditionStatus", 1))))))
+                    .andExpect(jsonPath("$.code").value(1001));
+            mockMvc.perform(get("/api/stock/page")
+                            .header("Authorization", "Bearer " + token)
+                            .param("equipmentName", TEST_EQUIPMENT))
+                    .andExpect(jsonPath("$.data.records[0].quantity").value(7))
+                    .andExpect(jsonPath("$.data.records[0].lockedQuantity").value(0));
+        } finally {
+            cleanup();
+        }
+    }
+
+    @Test
+    void scrapDispose_shouldNotConsumeLockedStock() throws Exception {
+        String token = loginAdmin();
+        try {
+            long[] ids = prepareBase(token, 10);
+            long borrowId = createBorrow(token, ids, 6);
+            // 可用库存 4，报废 8 件必须在处置时被拦截
+            mockMvc.perform(post("/api/scrap")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of(
+                                    "warehouseId", ids[1],
+                                    "scrapType", 2,
+                                    "items", List.of(Map.of(
+                                            "equipmentId", ids[0],
+                                            "quantity", 8,
+                                            "scrapReason", "锁定库存报废测试"))))))
+                    .andExpect(jsonPath("$.code").value(0));
+            Long scrapId = ((Number) JSONUtil.parseObj(
+                    mockMvc.perform(get("/api/scrap/page")
+                                    .header("Authorization", "Bearer " + token)
+                                    .param("status", "0"))
+                            .andReturn().getResponse().getContentAsString())
+                    .getByPath("data.records[0].id")).longValue();
+            mockMvc.perform(put("/api/scrap/audit")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of("orderId", scrapId, "pass", true))))
+                    .andExpect(jsonPath("$.code").value(0));
+            mockMvc.perform(put("/api/scrap/dispose")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of("orderId", scrapId, "disposeMethod", 1))))
+                    .andExpect(jsonPath("$.code").value(3001));
+
+            // 库存与锁定均未被扣减
+            mockMvc.perform(get("/api/stock/page")
+                            .header("Authorization", "Bearer " + token)
+                            .param("equipmentName", TEST_EQUIPMENT))
+                    .andExpect(jsonPath("$.data.records[0].quantity").value(10))
+                    .andExpect(jsonPath("$.data.records[0].lockedQuantity").value(6));
+
+            // 借用单仍可正常发放
+            mockMvc.perform(put("/api/borrow/audit")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(JSONUtil.toJsonStr(Map.of("orderId", borrowId, "pass", true))))
+                    .andExpect(jsonPath("$.code").value(0));
+            mockMvc.perform(put("/api/borrow/" + borrowId + "/issue")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(jsonPath("$.code").value(0));
+            mockMvc.perform(get("/api/stock/page")
+                            .header("Authorization", "Bearer " + token)
+                            .param("equipmentName", TEST_EQUIPMENT))
+                    .andExpect(jsonPath("$.data.records[0].quantity").value(4))
+                    .andExpect(jsonPath("$.data.records[0].lockedQuantity").value(0));
+        } finally {
+            cleanup();
+        }
+    }
+
+    private String returnBody(long orderId, long borrowItemId, int quantity) {
+        return JSONUtil.toJsonStr(Map.of(
+                "borrowOrderId", orderId,
+                "items", List.of(Map.of(
+                        "borrowItemId", borrowItemId,
+                        "quantity", quantity,
+                        "conditionStatus", 1))));
+    }
+
+    private List<Long> pendingReturnIds(String token, long orderId) throws Exception {
+        MvcResult page = mockMvc.perform(get("/api/return/page")
+                        .header("Authorization", "Bearer " + token)
+                        .param("status", "0"))
+                .andReturn();
+        Object raw = JSONUtil.parseObj(page.getResponse().getContentAsString()).getByPath("data.records");
+        return ((List<?>) raw).stream()
+                .map(row -> (cn.hutool.json.JSONObject) row)
+                .filter(row -> orderId == ((Number) row.get("borrowOrderId")).longValue())
+                .map(row -> ((Number) row.get("id")).longValue())
+                .sorted(Comparator.naturalOrder())
+                .toList();
+    }
+
     private long createBorrow(String token, long[] ids, int quantity) throws Exception {
         MvcResult result = mockMvc.perform(post("/api/borrow")
                         .header("Authorization", "Bearer " + token)
@@ -286,6 +461,8 @@ class BorrowReturnTest {
     private void cleanup() {
         jdbcTemplate.update("DELETE FROM return_item");
         jdbcTemplate.update("DELETE FROM return_order");
+        jdbcTemplate.update("DELETE FROM scrap_item");
+        jdbcTemplate.update("DELETE FROM scrap_order");
         jdbcTemplate.update("DELETE FROM borrow_item");
         jdbcTemplate.update("DELETE FROM borrow_order");
         jdbcTemplate.update("DELETE FROM stock_record");

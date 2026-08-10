@@ -31,6 +31,18 @@ public interface EquipmentStockMapper extends BaseMapper<EquipmentStock> {
                          @Param("updateBy") Long updateBy);
 
     /**
+     * 按可用库存扣减（报废处置/盘亏）：不占用已锁定数量，防止扣掉待发放的锁定库存。
+     */
+    @Update("UPDATE equipment_stock SET quantity = quantity - #{quantity}, update_by = #{updateBy}, " +
+            "update_time = NOW(), version = version + 1 " +
+            "WHERE equipment_id = #{equipmentId} AND warehouse_id = #{warehouseId} " +
+            "AND (quantity - locked_quantity) >= #{quantity}")
+    int subtractAvailableQuantity(@Param("equipmentId") Long equipmentId,
+                                  @Param("warehouseId") Long warehouseId,
+                                  @Param("quantity") int quantity,
+                                  @Param("updateBy") Long updateBy);
+
+    /**
      * 锁定库存（借用申请提交）：条件 quantity - locked >= qty，防止并发超借。
      */
     @Update("UPDATE equipment_stock SET locked_quantity = locked_quantity + #{quantity}, " +
