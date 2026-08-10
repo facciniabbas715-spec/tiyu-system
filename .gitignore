@@ -41,3 +41,6 @@ application-prod.yml
 
 # ---------- Git worktrees ----------
 .worktrees/
+
+# ---------- Playwright CLI 调试产物 ----------
+.playwright-cli/
