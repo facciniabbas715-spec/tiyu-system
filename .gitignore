@@ -29,6 +29,8 @@ logs/
 temp/
 *.tmp
 backups/
+output/
+.playwright-cli/
 
 # ---------- Environment / Secrets ----------
 .env
