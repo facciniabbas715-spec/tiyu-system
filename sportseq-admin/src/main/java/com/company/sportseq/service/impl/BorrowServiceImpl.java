@@ -73,12 +73,14 @@ public class BorrowServiceImpl implements BorrowService {
                 .like(StrUtil.isNotBlank(orderNo), BorrowOrder::getOrderNo, orderNo)
                 .eq(status != null, BorrowOrder::getStatus, status)
                 .eq(borrowUserId != null, BorrowOrder::getUserId, borrowUserId);
+        if (StrUtil.isNotBlank(username)) {
+            wrapper.apply("user_id IN (SELECT id FROM sys_user WHERE username LIKE CONCAT('%', {0}, '%'))",
+                    username);
+        }
         applyDataScope(wrapper);
         wrapper.orderByDesc(BorrowOrder::getCreateTime);
         Page<BorrowOrder> page = orderMapper.selectPage(new Page<>(current, size), wrapper);
         List<BorrowOrderVO> records = page.getRecords().stream()
-                .filter(order -> StrUtil.isBlank(username) || StrUtil.containsIgnoreCase(
-                        fetchUser(order.getUserId()).getUsername(), username))
                 .map(this::toVo)
                 .toList();
         return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
