@@ -38,3 +38,6 @@ application-prod.yml
 
 # ---------- IDE local history ----------
 .history/
+
+# ---------- Git worktrees ----------
+.worktrees/
