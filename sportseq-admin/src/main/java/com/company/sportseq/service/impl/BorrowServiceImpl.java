@@ -75,8 +75,9 @@ public class BorrowServiceImpl implements BorrowService {
                 .eq(status != null, BorrowOrder::getStatus, status)
                 .eq(borrowUserId != null, BorrowOrder::getUserId, borrowUserId);
         if (StrUtil.isNotBlank(username)) {
-            wrapper.apply("user_id IN (SELECT id FROM sys_user WHERE username LIKE CONCAT('%', {0}, '%'))",
-                    username);
+            wrapper.apply("user_id IN (SELECT id FROM sys_user WHERE username LIKE CONCAT('%', {0}, '%') " +
+                            "OR real_name LIKE CONCAT('%', {1}, '%'))",
+                    username, username);
         }
         applyDataScope(wrapper);
         wrapper.orderByDesc(BorrowOrder::getCreateTime);

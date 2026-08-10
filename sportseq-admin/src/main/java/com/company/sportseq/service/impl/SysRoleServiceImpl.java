@@ -92,8 +92,10 @@ public class SysRoleServiceImpl implements SysRoleService {
         role.setDataScope(dto.getDataScope() == null ? 1 : dto.getDataScope());
         role.setRemark(dto.getRemark());
         roleMapper.updateById(role);
-        roleMenuMapper.deleteByRoleId(dto.getId());
-        assignMenus(dto.getId(), dto.getMenuIds());
+        if (dto.getMenuIds() != null) {
+            roleMenuMapper.deleteByRoleId(dto.getId());
+            assignMenus(dto.getId(), dto.getMenuIds());
+        }
     }
 
     @Override

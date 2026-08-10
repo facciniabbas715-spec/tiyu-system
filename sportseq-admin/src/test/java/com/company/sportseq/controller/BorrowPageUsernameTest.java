@@ -77,6 +77,15 @@ class BorrowPageUsernameTest {
                             .param("username", "不存在的用户"))
                     .andExpect(jsonPath("$.code").value(0))
                     .andExpect(jsonPath("$.data.total").value(0));
+
+            // 前端“借用人”展示的是真实姓名，按真实姓名也应能过滤
+            mockMvc.perform(get("/api/borrow/page")
+                            .header("Authorization", "Bearer " + admin)
+                            .param("size", "10")
+                            .param("username", "借用分页测试用户"))
+                    .andExpect(jsonPath("$.code").value(0))
+                    .andExpect(jsonPath("$.data.total").value(1))
+                    .andExpect(jsonPath("$.data.records[0].purpose").value("测试用户借用"));
         } finally {
             cleanup();
         }
