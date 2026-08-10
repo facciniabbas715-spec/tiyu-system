@@ -1,6 +1,7 @@
 package com.company.sportseq.controller;
 
 import com.company.sportseq.common.result.Result;
+import com.company.sportseq.annotation.Log;
 import com.company.sportseq.dto.LoginDTO;
 import com.company.sportseq.dto.UpdatePasswordDTO;
 import com.company.sportseq.service.AuthService;
@@ -46,6 +47,7 @@ public class AuthController {
     }
 
     @PutMapping("/updatePassword")
+    @Log(title = "修改密码", businessType = 2)
     public Result<Void> updatePassword(@Valid @RequestBody UpdatePasswordDTO dto, HttpServletRequest request) {
         authService.updatePassword(dto, request);
         return Result.success();

@@ -2,6 +2,7 @@ package com.company.sportseq.controller;
 
 import com.company.sportseq.common.result.PageResult;
 import com.company.sportseq.common.result.Result;
+import com.company.sportseq.annotation.Log;
 import com.company.sportseq.dto.ResetPasswordDTO;
 import com.company.sportseq.dto.UserDTO;
 import com.company.sportseq.dto.UserStatusDTO;
@@ -45,6 +46,7 @@ public class SysUserController {
     }
 
     @PostMapping
+    @Log(title = "用户管理", businessType = 1)
     @PreAuthorize("hasAuthority('system:user:add')")
     public Result<Void> add(@Valid @RequestBody UserDTO dto) {
         userService.add(dto);
@@ -52,6 +54,7 @@ public class SysUserController {
     }
 
     @PutMapping
+    @Log(title = "用户管理", businessType = 2)
     @PreAuthorize("hasAuthority('system:user:edit')")
     public Result<Void> update(@Valid @RequestBody UserDTO dto) {
         userService.update(dto);
@@ -59,6 +62,7 @@ public class SysUserController {
     }
 
     @DeleteMapping("/{id}")
+    @Log(title = "用户管理", businessType = 3)
     @PreAuthorize("hasAuthority('system:user:remove')")
     public Result<Void> remove(@PathVariable Long id) {
         userService.remove(id);
@@ -66,6 +70,7 @@ public class SysUserController {
     }
 
     @PutMapping("/resetPassword")
+    @Log(title = "重置密码", businessType = 2)
     @PreAuthorize("hasAuthority('system:user:resetPwd')")
     public Result<Void> resetPassword(@Valid @RequestBody ResetPasswordDTO dto) {
         userService.resetPassword(dto);
@@ -73,6 +78,7 @@ public class SysUserController {
     }
 
     @PutMapping("/status")
+    @Log(title = "用户状态", businessType = 2)
     @PreAuthorize("hasAuthority('system:user:edit')")
     public Result<Void> changeStatus(@Valid @RequestBody UserStatusDTO dto) {
         userService.changeStatus(dto);

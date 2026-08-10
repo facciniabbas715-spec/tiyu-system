@@ -1,6 +1,7 @@
 package com.company.sportseq.controller;
 
 import com.company.sportseq.common.result.Result;
+import com.company.sportseq.annotation.Log;
 import com.company.sportseq.dto.MenuDTO;
 import com.company.sportseq.service.SysMenuService;
 import com.company.sportseq.vo.MenuVO;
@@ -39,6 +40,7 @@ public class SysMenuController {
     }
 
     @PostMapping
+    @Log(title = "菜单管理", businessType = 1)
     @PreAuthorize("hasAuthority('system:menu:add')")
     public Result<Void> add(@Valid @RequestBody MenuDTO dto) {
         menuService.add(dto);
@@ -46,6 +48,7 @@ public class SysMenuController {
     }
 
     @PutMapping
+    @Log(title = "菜单管理", businessType = 2)
     @PreAuthorize("hasAuthority('system:menu:edit')")
     public Result<Void> update(@Valid @RequestBody MenuDTO dto) {
         menuService.update(dto);
@@ -53,6 +56,7 @@ public class SysMenuController {
     }
 
     @DeleteMapping("/{id}")
+    @Log(title = "菜单管理", businessType = 3)
     @PreAuthorize("hasAuthority('system:menu:remove')")
     public Result<Void> remove(@PathVariable Long id) {
         menuService.remove(id);

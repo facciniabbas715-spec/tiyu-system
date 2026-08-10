@@ -2,6 +2,7 @@ package com.company.sportseq.controller;
 
 import com.company.sportseq.common.result.PageResult;
 import com.company.sportseq.common.result.Result;
+import com.company.sportseq.annotation.Log;
 import com.company.sportseq.dto.RoleDTO;
 import com.company.sportseq.service.SysRoleService;
 import com.company.sportseq.vo.RoleVO;
@@ -37,6 +38,7 @@ public class SysRoleController {
     }
 
     @PostMapping
+    @Log(title = "角色管理", businessType = 1)
     @PreAuthorize("hasAuthority('system:role:add')")
     public Result<Void> add(@Valid @RequestBody RoleDTO dto) {
         roleService.add(dto);
@@ -44,6 +46,7 @@ public class SysRoleController {
     }
 
     @PutMapping
+    @Log(title = "角色管理", businessType = 2)
     @PreAuthorize("hasAuthority('system:role:edit')")
     public Result<Void> update(@Valid @RequestBody RoleDTO dto) {
         roleService.update(dto);
@@ -51,6 +54,7 @@ public class SysRoleController {
     }
 
     @DeleteMapping("/{id}")
+    @Log(title = "角色管理", businessType = 3)
     @PreAuthorize("hasAuthority('system:role:remove')")
     public Result<Void> remove(@PathVariable Long id) {
         roleService.remove(id);
@@ -64,6 +68,7 @@ public class SysRoleController {
     }
 
     @PutMapping("/{id}/menus")
+    @Log(title = "角色授权", businessType = 2)
     @PreAuthorize("hasAuthority('system:role:assignMenu')")
     public Result<Void> assignMenus(@PathVariable Long id, @RequestBody List<Long> menuIds) {
         roleService.assignMenus(id, menuIds);
