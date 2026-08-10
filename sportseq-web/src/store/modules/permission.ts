@@ -22,13 +22,23 @@ function resolveComponent(component: string) {
 function buildRoutes(nodes: RouterNode[], parentPath = ''): RouteRecordRaw[] {
   return nodes.map((node) => {
     const path = parentPath ? `${parentPath}/${node.path}`.replace(/\/+/g, '/') : node.path
+    // 目录路由（component=Layout）挂在 Root 布局下，不再重复嵌套 Layout，
+    // 否则会出现“布局套布局”（页面内又渲染一套侧边栏）。
+    if (node.component && node.component !== 'Layout') {
+      return {
+        path,
+        name: node.name,
+        component: resolveComponent(node.component),
+        meta: { title: node.meta.title, icon: node.meta.icon },
+        children: node.children ? buildRoutes(node.children, path) : undefined,
+      } as RouteRecordRaw
+    }
     return {
       path,
       name: node.name,
-      component: resolveComponent(node.component),
       meta: { title: node.meta.title, icon: node.meta.icon },
       children: node.children ? buildRoutes(node.children, path) : undefined,
-    }
+    } as RouteRecordRaw
   })
 }
 

@@ -27,7 +27,8 @@ export function setupRouterGuard(router: Router): void {
         try {
           const dynamicRoutes = await permissionStore.generateRoutes()
           dynamicRoutes.forEach((route) => router.addRoute('Root', route))
-          return { ...to, replace: true }
+          // 只按 path 重新导航，避免把 404 路由的 name 一起带回导致仍解析到 404
+          return { path: to.path, query: to.query, hash: to.hash, replace: true }
         } catch {
           userStore.reset()
           permissionStore.reset()
