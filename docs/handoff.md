@@ -4,7 +4,7 @@
 
 ## 1. 一句话当前进度
 
-系统已完成阶段 0-11（脚手架、数据库、认证、权限、系统管理、器材基础、库存入库、借用归还、报废、统计分析、本地联调加固），后端 **35 个集成测试全绿**，前端构建通过，本地冒烟测试全通过；**暂不部署上线**，后续按需迭代维护。
+系统已完成阶段 0-11（脚手架、数据库、认证、权限、系统管理、器材基础、库存入库、借用归还、报废、统计分析、本地联调加固）及第 8 节中危项处理清单（commit 18-24），后端 **65 个集成测试全绿**，前端构建通过，本地冒烟测试全通过；**暂不部署上线**，后续按需迭代维护。
 
 ## 2. 环境基线（重要）
 
@@ -32,6 +32,8 @@ c77ff8d feat: 借用归还模块（库存锁定/领用/归还回补/逾期违约
 ```
 
 约定：commit 编号与主计划对应；阶段 11 按用户要求仅做本地联调加固（未上线、未打 tag v1.0.0）。全部工作提交在 develop；main 只接受 release 合并。
+
+中危项处理提交：commit 18（用户会话踢出）、19（器材删除校验）、20（仓库删除校验）、21（admin 角色保护）、22（菜单成环校验）、23（借用分页 SQL 过滤）、24（列表 N+1 批量优化），详见第 11 节。
 
 ## 4. 架构速览
 
@@ -104,6 +106,7 @@ npm run build
 ## 8. 中危项处理清单（交给新对话窗口）
 
 > 用户已要求：在新对话窗口处理以下中危项。新窗口请先读取本文件，然后按清单逐项实现、补测试、提交。
+> **状态：已完成（commit 18-24）**，全量测试 65/65 通过，本地冒烟通过；逐项记录见第 11 节。
 
 1. **删除/重置密码/改角色后旧会话仍有效**：`SysUserServiceImpl.remove/resetPassword/update` 应调用现有 `kickUserSessions`（目前仅 `changeStatus` 停用时踢会话）；角色/权限变更后可考虑全量踢出或缩短缓存。
 2. **器材删除无业务校验**：`EquipmentServiceImpl.remove` 未使用已有 `EQUIPMENT_IN_USE`；应校验无库存（quantity+locked>0）、无未完结借用/报废后允许删除。
@@ -114,6 +117,18 @@ npm run build
 7. **列表 N+1 查询**：stock/borrow/return/scrap/equipment 的 VO 组装逐行查关联表，改用 `selectBatchIds` 批量查询。
 
 每项建议：先写/补集成测试再改代码（参考 `DataScopeTest`、`BorrowReturnTest` 模式），最后全量 `.\mvnw.cmd test` + 前端 `npm run type-check && npm run build`。
+
+## 11. 中危项处理完成记录（commit 18-24）
+
+1. **删除/重置密码/改角色后踢旧会话（commit 18）**：`SysUserServiceImpl.remove/resetPassword/update` 均调用现有 `kickUserSessions`；新增 `UserSessionKickTest` 3 例（重置密码、改角色、删除后旧 token 均 401）。
+2. **器材删除业务校验（commit 19）**：`EquipmentServiceImpl.remove` 校验在库库存（quantity+locked>0）、未完结借用（borrow_order.status 0-3）、未完结报废（scrap_order.status 0-1），命中返回 `EQUIPMENT_IN_USE(3004)`；新增 `EquipmentRemoveTest` 4 例。
+3. **仓库删除引用校验（commit 20）**：`WarehouseServiceImpl.remove` 校验 `equipment_stock`、入库单、归还单、报废单引用；新增 `WarehouseRemoveTest` 5 例。
+4. **内置 admin 角色保护（commit 21）**：`SysRoleServiceImpl.update/assignMenus` 对 id=1 禁止修改 roleKey/status，并要求保留全部菜单权限；新增 `AdminRoleProtectTest` 3 例。
+5. **菜单成环校验（commit 22）**：`SysMenuServiceImpl.update` 沿新父级祖先链校验，禁止挂到自身子孙；新增 `MenuCycleTest`（子级/孙级/自身均拦截，合法移动通过）。
+6. **借用分页按借用人过滤（commit 23）**：`BorrowServiceImpl.page` 改为 SQL 子查询过滤 username，`total` 准确；新增 `BorrowPageUsernameTest`。
+7. **列表 N+1 批量优化（commit 24）**：equipment/stock/borrow/return/scrap 五处分页 VO 组装改用 `selectBatchIds` 批量加载关联表；新增 `NPlusOneTest`，通过 MyBatis Executor 拦截器断言单次分页 SELECT 次数（器材≤4、库存≤6、借用≤7、归还≤8、报废≤6）。
+
+**验证结果**：`.\mvnw.cmd test` 65/65 通过；`npm run type-check`、`npm run build` 通过；重启后端后 `.\scripts\smoke-test.ps1` 全部通过。
 
 ## 9. 已知注意事项（踩过的坑）
 
