@@ -1,0 +1,40 @@
+# ---------- IDE ----------
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# ---------- OS ----------
+.DS_Store
+Thumbs.db
+
+# ---------- Java / Maven ----------
+target/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+.flattened-pom.xml
+
+# ---------- Node / Vite ----------
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+coverage/
+
+# ---------- Logs & Temp ----------
+logs/
+*.log
+temp/
+*.tmp
+
+# ---------- Environment / Secrets ----------
+.env
+.env.*
+!.env.example
+application-local.yml
+application-prod.yml
+
+# ---------- IDE local history ----------
+.history/
