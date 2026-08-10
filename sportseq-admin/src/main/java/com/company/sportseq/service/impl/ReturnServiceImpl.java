@@ -45,6 +45,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -77,7 +78,7 @@ public class ReturnServiceImpl implements ReturnService {
         applyDataScope(wrapper);
         wrapper.orderByDesc(ReturnOrder::getCreateTime);
         Page<ReturnOrder> page = returnOrderMapper.selectPage(new Page<>(current, size), wrapper);
-        List<ReturnOrderVO> records = page.getRecords().stream().map(this::toVo).toList();
+        List<ReturnOrderVO> records = buildVos(page.getRecords());
         return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
 
@@ -322,24 +323,95 @@ public class ReturnServiceImpl implements ReturnService {
     }
 
     private ReturnOrderVO toVo(ReturnOrder order) {
+        List<ReturnItem> items = returnItemMapper.selectList(
+                Wrappers.<ReturnItem>lambdaQuery().eq(ReturnItem::getReturnId, order.getId()));
+        List<Long> equipmentIds = items.stream()
+                .map(ReturnItem::getEquipmentId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Equipment> equipmentMap = equipmentIds.isEmpty() ? Map.of()
+                : equipmentMapper.selectBatchIds(equipmentIds).stream()
+                        .collect(Collectors.toMap(Equipment::getId, e -> e, (a, b) -> a));
         BorrowOrder borrowOrder = borrowOrderMapper.selectById(order.getBorrowOrderId());
         SysUser user = userMapper.selectById(order.getUserId());
         Warehouse warehouse = warehouseMapper.selectById(order.getWarehouseId());
-        List<ReturnItemVO> items = returnItemMapper.selectList(
-                        Wrappers.<ReturnItem>lambdaQuery().eq(ReturnItem::getReturnId, order.getId()))
-                .stream().map(item -> {
-                    Equipment equipment = equipmentMapper.selectById(item.getEquipmentId());
-                    return new ReturnItemVO(item.getId(), item.getBorrowItemId(),
-                            equipment == null ? null : equipment.getEquipmentCode(),
-                            equipment == null ? null : equipment.getEquipmentName(),
-                            item.getQuantity(), item.getConditionStatus(), item.getDamageDesc(),
-                            item.getIsOverdue(), item.getOverdueDays(), item.getPenaltyAmount());
-                }).toList();
+        Map<Long, BorrowOrder> borrowMap = borrowOrder == null ? Map.of()
+                : Map.of(order.getBorrowOrderId(), borrowOrder);
+        Map<Long, SysUser> userMap = user == null ? Map.of()
+                : Map.of(order.getUserId(), user);
+        Map<Long, Warehouse> warehouseMap = warehouse == null ? Map.of()
+                : Map.of(order.getWarehouseId(), warehouse);
+        return toVo(order, borrowMap, userMap, warehouseMap, items, equipmentMap);
+    }
+
+    private List<ReturnOrderVO> buildVos(List<ReturnOrder> orders) {
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        List<Long> borrowOrderIds = orders.stream()
+                .map(ReturnOrder::getBorrowOrderId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, BorrowOrder> borrowMap = borrowOrderIds.isEmpty() ? Map.of()
+                : borrowOrderMapper.selectBatchIds(borrowOrderIds).stream()
+                        .collect(Collectors.toMap(BorrowOrder::getId, b -> b, (a, b) -> a));
+        List<Long> userIds = orders.stream()
+                .map(ReturnOrder::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, SysUser> userMap = userIds.isEmpty() ? Map.of()
+                : userMapper.selectBatchIds(userIds).stream()
+                        .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
+        List<Long> warehouseIds = orders.stream()
+                .map(ReturnOrder::getWarehouseId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Warehouse> warehouseMap = warehouseIds.isEmpty() ? Map.of()
+                : warehouseMapper.selectBatchIds(warehouseIds).stream()
+                        .collect(Collectors.toMap(Warehouse::getId, w -> w, (a, b) -> a));
+        List<Long> returnIds = orders.stream().map(ReturnOrder::getId).toList();
+        List<ReturnItem> allItems = returnItemMapper.selectList(
+                Wrappers.<ReturnItem>lambdaQuery().in(ReturnItem::getReturnId, returnIds));
+        Map<Long, List<ReturnItem>> itemsByReturn = allItems.stream()
+                .collect(Collectors.groupingBy(ReturnItem::getReturnId));
+        List<Long> equipmentIds = allItems.stream()
+                .map(ReturnItem::getEquipmentId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Equipment> equipmentMap = equipmentIds.isEmpty() ? Map.of()
+                : equipmentMapper.selectBatchIds(equipmentIds).stream()
+                        .collect(Collectors.toMap(Equipment::getId, e -> e, (a, b) -> a));
+        return orders.stream()
+                .map(order -> toVo(order, borrowMap, userMap, warehouseMap,
+                        itemsByReturn.getOrDefault(order.getId(), List.of()),
+                        equipmentMap))
+                .toList();
+    }
+
+    private ReturnOrderVO toVo(ReturnOrder order, Map<Long, BorrowOrder> borrowMap,
+                               Map<Long, SysUser> userMap, Map<Long, Warehouse> warehouseMap,
+                               List<ReturnItem> items, Map<Long, Equipment> equipmentMap) {
+        BorrowOrder borrowOrder = borrowMap.get(order.getBorrowOrderId());
+        SysUser user = userMap.get(order.getUserId());
+        Warehouse warehouse = warehouseMap.get(order.getWarehouseId());
+        List<ReturnItemVO> itemVos = items.stream().map(item -> {
+            Equipment equipment = equipmentMap.get(item.getEquipmentId());
+            return new ReturnItemVO(item.getId(), item.getBorrowItemId(),
+                    equipment == null ? null : equipment.getEquipmentCode(),
+                    equipment == null ? null : equipment.getEquipmentName(),
+                    item.getQuantity(), item.getConditionStatus(), item.getDamageDesc(),
+                    item.getIsOverdue(), item.getOverdueDays(), item.getPenaltyAmount());
+        }).toList();
         return new ReturnOrderVO(order.getId(), order.getOrderNo(), order.getBorrowOrderId(),
                 borrowOrder == null ? null : borrowOrder.getOrderNo(),
                 user == null ? null : user.getUsername(),
                 order.getWarehouseId(), warehouse == null ? null : warehouse.getWarehouseName(),
                 order.getTotalQuantity(), order.getReturnType(), order.getStatus(),
-                order.getConfirmRemark(), order.getRemark(), order.getCreateTime(), items);
+                order.getConfirmRemark(), order.getRemark(), order.getCreateTime(), itemVos);
     }
 }

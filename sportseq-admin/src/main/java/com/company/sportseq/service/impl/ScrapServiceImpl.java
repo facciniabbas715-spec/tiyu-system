@@ -34,6 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -60,7 +63,7 @@ public class ScrapServiceImpl implements ScrapService {
                         .like(StrUtil.isNotBlank(orderNo), ScrapOrder::getOrderNo, orderNo)
                         .eq(status != null, ScrapOrder::getStatus, status)
                         .orderByDesc(ScrapOrder::getCreateTime));
-        List<ScrapOrderVO> records = page.getRecords().stream().map(this::toVo).toList();
+        List<ScrapOrderVO> records = buildVos(page.getRecords());
         return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
 
@@ -191,21 +194,69 @@ public class ScrapServiceImpl implements ScrapService {
     }
 
     private ScrapOrderVO toVo(ScrapOrder order) {
+        List<ScrapItem> items = itemMapper.selectList(
+                Wrappers.<ScrapItem>lambdaQuery().eq(ScrapItem::getScrapId, order.getId()));
+        List<Long> equipmentIds = items.stream()
+                .map(ScrapItem::getEquipmentId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Equipment> equipmentMap = equipmentIds.isEmpty() ? Map.of()
+                : equipmentMapper.selectBatchIds(equipmentIds).stream()
+                        .collect(Collectors.toMap(Equipment::getId, e -> e, (a, b) -> a));
         Warehouse warehouse = warehouseMapper.selectById(order.getWarehouseId());
-        List<ScrapItemVO> items = itemMapper.selectList(
-                        Wrappers.<ScrapItem>lambdaQuery().eq(ScrapItem::getScrapId, order.getId()))
-                .stream().map(item -> {
-                    Equipment equipment = equipmentMapper.selectById(item.getEquipmentId());
-                    return new ScrapItemVO(item.getId(), item.getEquipmentId(),
-                            equipment == null ? null : equipment.getEquipmentCode(),
-                            equipment == null ? null : equipment.getEquipmentName(),
-                            equipment == null ? null : equipment.getUnit(),
-                            item.getQuantity(), item.getScrapReason(), item.getLossAmount());
-                }).toList();
+        Map<Long, Warehouse> warehouseMap = warehouse == null ? Map.of()
+                : Map.of(order.getWarehouseId(), warehouse);
+        return toVo(order, warehouseMap, items, equipmentMap);
+    }
+
+    private List<ScrapOrderVO> buildVos(List<ScrapOrder> orders) {
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        List<Long> warehouseIds = orders.stream()
+                .map(ScrapOrder::getWarehouseId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Warehouse> warehouseMap = warehouseIds.isEmpty() ? Map.of()
+                : warehouseMapper.selectBatchIds(warehouseIds).stream()
+                        .collect(Collectors.toMap(Warehouse::getId, w -> w, (a, b) -> a));
+        List<Long> scrapIds = orders.stream().map(ScrapOrder::getId).toList();
+        List<ScrapItem> allItems = itemMapper.selectList(
+                Wrappers.<ScrapItem>lambdaQuery().in(ScrapItem::getScrapId, scrapIds));
+        Map<Long, List<ScrapItem>> itemsByScrap = allItems.stream()
+                .collect(Collectors.groupingBy(ScrapItem::getScrapId));
+        List<Long> equipmentIds = allItems.stream()
+                .map(ScrapItem::getEquipmentId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Equipment> equipmentMap = equipmentIds.isEmpty() ? Map.of()
+                : equipmentMapper.selectBatchIds(equipmentIds).stream()
+                        .collect(Collectors.toMap(Equipment::getId, e -> e, (a, b) -> a));
+        return orders.stream()
+                .map(order -> toVo(order, warehouseMap,
+                        itemsByScrap.getOrDefault(order.getId(), List.of()),
+                        equipmentMap))
+                .toList();
+    }
+
+    private ScrapOrderVO toVo(ScrapOrder order, Map<Long, Warehouse> warehouseMap,
+                              List<ScrapItem> items, Map<Long, Equipment> equipmentMap) {
+        Warehouse warehouse = warehouseMap.get(order.getWarehouseId());
+        List<ScrapItemVO> itemVos = items.stream().map(item -> {
+            Equipment equipment = equipmentMap.get(item.getEquipmentId());
+            return new ScrapItemVO(item.getId(), item.getEquipmentId(),
+                    equipment == null ? null : equipment.getEquipmentCode(),
+                    equipment == null ? null : equipment.getEquipmentName(),
+                    equipment == null ? null : equipment.getUnit(),
+                    item.getQuantity(), item.getScrapReason(), item.getLossAmount());
+        }).toList();
         return new ScrapOrderVO(order.getId(), order.getOrderNo(), order.getWarehouseId(),
                 warehouse == null ? null : warehouse.getWarehouseName(), order.getScrapType(),
                 order.getTotalQuantity(), order.getTotalLossAmount(), order.getStatus(),
                 order.getAuditRemark(), order.getDisposeMethod(), order.getRemark(),
-                order.getCreateTime(), items);
+                order.getCreateTime(), itemVos);
     }
 }

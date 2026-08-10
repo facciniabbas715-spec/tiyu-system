@@ -32,6 +32,9 @@ import java.io.IOException;
 import java.time.Year;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -54,8 +57,19 @@ public class EquipmentServiceImpl implements EquipmentService {
                         .eq(categoryId != null, Equipment::getCategoryId, categoryId)
                         .eq(status != null, Equipment::getStatus, status)
                         .orderByDesc(Equipment::getCreateTime));
-        List<EquipmentVO> records = page.getRecords().stream().map(this::toVo).toList();
-        return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
+        List<Equipment> records = page.getRecords();
+        List<Long> categoryIds = records.stream()
+                .map(Equipment::getCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, EquipmentCategory> categoryMap = categoryIds.isEmpty() ? Map.of()
+                : categoryMapper.selectBatchIds(categoryIds).stream()
+                        .collect(Collectors.toMap(EquipmentCategory::getId, c -> c, (a, b) -> a));
+        List<EquipmentVO> vos = records.stream()
+                .map(e -> toVo(e, categoryMap))
+                .toList();
+        return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), vos);
     }
 
     @Override
@@ -226,9 +240,13 @@ public class EquipmentServiceImpl implements EquipmentService {
     }
 
     private EquipmentVO toVo(Equipment equipment) {
+        return toVo(equipment, Map.of());
+    }
+
+    private EquipmentVO toVo(Equipment equipment, Map<Long, EquipmentCategory> categoryMap) {
         String categoryName = null;
         if (equipment.getCategoryId() != null) {
-            EquipmentCategory category = categoryMapper.selectById(equipment.getCategoryId());
+            EquipmentCategory category = categoryMap.get(equipment.getCategoryId());
             categoryName = category == null ? null : category.getCategoryName();
         }
         return new EquipmentVO(equipment.getId(), equipment.getEquipmentCode(), equipment.getEquipmentName(),

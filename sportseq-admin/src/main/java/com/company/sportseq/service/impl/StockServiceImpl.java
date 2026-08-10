@@ -27,6 +27,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -45,10 +48,28 @@ public class StockServiceImpl implements StockService {
                 Wrappers.<EquipmentStock>lambdaQuery()
                         .eq(warehouseId != null, EquipmentStock::getWarehouseId, warehouseId)
                         .orderByDesc(EquipmentStock::getUpdateTime));
-        List<StockVO> records = page.getRecords().stream()
-                .filter(stock -> filterEquipment(stock.getEquipmentId(), equipmentName, equipmentCode, categoryId))
-                .filter(stock -> !Boolean.TRUE.equals(warningOnly) || isWarning(stock))
-                .map(this::toVo)
+        List<EquipmentStock> stocks = page.getRecords();
+        Map<Long, Equipment> equipmentMap = batchEquipment(
+                stocks.stream().map(EquipmentStock::getEquipmentId).distinct().toList());
+        List<EquipmentStock> filtered = stocks.stream()
+                .filter(stock -> filterEquipment(stock.getEquipmentId(), equipmentName, equipmentCode,
+                        categoryId, equipmentMap))
+                .filter(stock -> !Boolean.TRUE.equals(warningOnly) || isWarning(stock, equipmentMap))
+                .toList();
+        List<Long> categoryIds = filtered.stream()
+                .map(stock -> equipmentMap.get(stock.getEquipmentId()))
+                .filter(Objects::nonNull)
+                .map(Equipment::getCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, EquipmentCategory> categoryMap = categoryIds.isEmpty() ? Map.of()
+                : categoryMapper.selectBatchIds(categoryIds).stream()
+                        .collect(Collectors.toMap(EquipmentCategory::getId, c -> c, (a, b) -> a));
+        Map<Long, Warehouse> warehouseMap = batchWarehouse(
+                filtered.stream().map(EquipmentStock::getWarehouseId).distinct().toList());
+        List<StockVO> records = filtered.stream()
+                .map(stock -> toVo(stock, equipmentMap, categoryMap, warehouseMap))
                 .toList();
         return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
@@ -68,9 +89,26 @@ public class StockServiceImpl implements StockService {
 
     @Override
     public List<StockVO> warnings() {
-        return stockMapper.selectList(null).stream()
-                .filter(this::isWarning)
-                .map(this::toVo)
+        List<EquipmentStock> stocks = stockMapper.selectList(null);
+        Map<Long, Equipment> equipmentMap = batchEquipment(
+                stocks.stream().map(EquipmentStock::getEquipmentId).distinct().toList());
+        List<EquipmentStock> warnings = stocks.stream()
+                .filter(stock -> isWarning(stock, equipmentMap))
+                .toList();
+        List<Long> categoryIds = warnings.stream()
+                .map(stock -> equipmentMap.get(stock.getEquipmentId()))
+                .filter(Objects::nonNull)
+                .map(Equipment::getCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, EquipmentCategory> categoryMap = categoryIds.isEmpty() ? Map.of()
+                : categoryMapper.selectBatchIds(categoryIds).stream()
+                        .collect(Collectors.toMap(EquipmentCategory::getId, c -> c, (a, b) -> a));
+        Map<Long, Warehouse> warehouseMap = batchWarehouse(
+                warnings.stream().map(EquipmentStock::getWarehouseId).distinct().toList());
+        return warnings.stream()
+                .map(stock -> toVo(stock, equipmentMap, categoryMap, warehouseMap))
                 .toList();
     }
 
@@ -123,11 +161,12 @@ public class StockServiceImpl implements StockService {
         recordMapper.insert(record);
     }
 
-    private boolean filterEquipment(Long equipmentId, String name, String code, Long categoryId) {
+    private boolean filterEquipment(Long equipmentId, String name, String code, Long categoryId,
+                                    Map<Long, Equipment> equipmentMap) {
         if (StrUtil.isBlank(name) && StrUtil.isBlank(code) && categoryId == null) {
             return true;
         }
-        Equipment equipment = equipmentMapper.selectById(equipmentId);
+        Equipment equipment = equipmentMap.get(equipmentId);
         if (equipment == null) {
             return false;
         }
@@ -140,17 +179,18 @@ public class StockServiceImpl implements StockService {
         return categoryId == null || categoryId.equals(equipment.getCategoryId());
     }
 
-    private boolean isWarning(EquipmentStock stock) {
-        Equipment equipment = equipmentMapper.selectById(stock.getEquipmentId());
+    private boolean isWarning(EquipmentStock stock, Map<Long, Equipment> equipmentMap) {
+        Equipment equipment = equipmentMap.get(stock.getEquipmentId());
         return equipment != null && stock.getQuantity() <= (equipment.getSafeStock() == null ? 0 : equipment.getSafeStock());
     }
 
-    private StockVO toVo(EquipmentStock stock) {
-        Equipment equipment = equipmentMapper.selectById(stock.getEquipmentId());
-        Warehouse warehouse = warehouseMapper.selectById(stock.getWarehouseId());
+    private StockVO toVo(EquipmentStock stock, Map<Long, Equipment> equipmentMap,
+                         Map<Long, EquipmentCategory> categoryMap, Map<Long, Warehouse> warehouseMap) {
+        Equipment equipment = equipmentMap.get(stock.getEquipmentId());
+        Warehouse warehouse = warehouseMap.get(stock.getWarehouseId());
         String categoryName = null;
         if (equipment != null && equipment.getCategoryId() != null) {
-            EquipmentCategory category = categoryMapper.selectById(equipment.getCategoryId());
+            EquipmentCategory category = categoryMap.get(equipment.getCategoryId());
             categoryName = category == null ? null : category.getCategoryName();
         }
         int safeStock = equipment == null || equipment.getSafeStock() == null ? 0 : equipment.getSafeStock();
@@ -165,6 +205,22 @@ public class StockServiceImpl implements StockService {
                 stock.getLockedQuantity(),
                 safeStock,
                 stock.getQuantity() <= safeStock);
+    }
+
+    private Map<Long, Equipment> batchEquipment(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return equipmentMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(Equipment::getId, e -> e, (a, b) -> a));
+    }
+
+    private Map<Long, Warehouse> batchWarehouse(List<Long> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return warehouseMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(Warehouse::getId, w -> w, (a, b) -> a));
     }
 
     private StockRecordVO toRecordVo(StockRecord record) {

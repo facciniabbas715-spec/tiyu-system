@@ -40,6 +40,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -80,9 +81,7 @@ public class BorrowServiceImpl implements BorrowService {
         applyDataScope(wrapper);
         wrapper.orderByDesc(BorrowOrder::getCreateTime);
         Page<BorrowOrder> page = orderMapper.selectPage(new Page<>(current, size), wrapper);
-        List<BorrowOrderVO> records = page.getRecords().stream()
-                .map(this::toVo)
-                .toList();
+        List<BorrowOrderVO> records = buildVos(page.getRecords());
         return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
 
@@ -313,12 +312,62 @@ public class BorrowServiceImpl implements BorrowService {
         List<BorrowItem> items = loadItems(order.getId());
         Map<Long, Equipment> equipmentMap = items.stream()
                 .map(i -> equipmentMapper.selectById(i.getEquipmentId()))
-                .filter(e -> e != null)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toMap(Equipment::getId, e -> e, (a, b) -> a));
         Map<Long, Warehouse> warehouseMap = items.stream()
                 .map(i -> warehouseMapper.selectById(i.getWarehouseId()))
-                .filter(w -> w != null)
+                .filter(Objects::nonNull)
                 .collect(Collectors.toMap(Warehouse::getId, w -> w, (a, b) -> a));
+        return toVo(order, Map.of(order.getUserId(), user), items, equipmentMap, warehouseMap);
+    }
+
+    private List<BorrowOrderVO> buildVos(List<BorrowOrder> orders) {
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+        List<Long> userIds = orders.stream()
+                .map(BorrowOrder::getUserId)
+                .distinct()
+                .toList();
+        Map<Long, SysUser> userMap = userIds.isEmpty() ? Map.of()
+                : userMapper.selectBatchIds(userIds).stream()
+                        .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
+        List<Long> orderIds = orders.stream().map(BorrowOrder::getId).toList();
+        Map<Long, List<BorrowItem>> itemsByOrder = itemMapper.selectList(
+                        Wrappers.<BorrowItem>lambdaQuery().in(BorrowItem::getBorrowId, orderIds))
+                .stream()
+                .collect(Collectors.groupingBy(BorrowItem::getBorrowId));
+        List<Long> equipmentIds = itemsByOrder.values().stream()
+                .flatMap(List::stream)
+                .map(BorrowItem::getEquipmentId)
+                .distinct()
+                .toList();
+        Map<Long, Equipment> equipmentMap = equipmentIds.isEmpty() ? Map.of()
+                : equipmentMapper.selectBatchIds(equipmentIds).stream()
+                        .collect(Collectors.toMap(Equipment::getId, e -> e, (a, b) -> a));
+        List<Long> warehouseIds = itemsByOrder.values().stream()
+                .flatMap(List::stream)
+                .map(BorrowItem::getWarehouseId)
+                .distinct()
+                .toList();
+        Map<Long, Warehouse> warehouseMap = warehouseIds.isEmpty() ? Map.of()
+                : warehouseMapper.selectBatchIds(warehouseIds).stream()
+                        .collect(Collectors.toMap(Warehouse::getId, w -> w, (a, b) -> a));
+        return orders.stream()
+                .map(order -> toVo(order, userMap,
+                        itemsByOrder.getOrDefault(order.getId(), List.of()),
+                        equipmentMap, warehouseMap))
+                .toList();
+    }
+
+    private BorrowOrderVO toVo(BorrowOrder order, Map<Long, SysUser> userMap,
+                               List<BorrowItem> items,
+                               Map<Long, Equipment> equipmentMap,
+                               Map<Long, Warehouse> warehouseMap) {
+        SysUser user = userMap.get(order.getUserId());
+        if (user == null) {
+            user = new SysUser();
+        }
         List<BorrowItemVO> itemVos = items.stream().map(item -> {
             Equipment equipment = equipmentMap.get(item.getEquipmentId());
             Warehouse warehouse = warehouseMap.get(item.getWarehouseId());
