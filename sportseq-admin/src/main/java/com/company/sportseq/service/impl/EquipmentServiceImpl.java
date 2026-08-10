@@ -10,10 +10,16 @@ import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
 import com.company.sportseq.dto.EquipmentDTO;
 import com.company.sportseq.dto.EquipmentImportDTO;
+import com.company.sportseq.entity.BorrowItem;
 import com.company.sportseq.entity.Equipment;
 import com.company.sportseq.entity.EquipmentCategory;
+import com.company.sportseq.entity.EquipmentStock;
+import com.company.sportseq.entity.ScrapItem;
+import com.company.sportseq.mapper.BorrowItemMapper;
 import com.company.sportseq.mapper.EquipmentCategoryMapper;
 import com.company.sportseq.mapper.EquipmentMapper;
+import com.company.sportseq.mapper.EquipmentStockMapper;
+import com.company.sportseq.mapper.ScrapItemMapper;
 import com.company.sportseq.service.EquipmentService;
 import com.company.sportseq.vo.EquipmentVO;
 import com.company.sportseq.vo.ImportResultVO;
@@ -33,6 +39,9 @@ public class EquipmentServiceImpl implements EquipmentService {
 
     private final EquipmentMapper equipmentMapper;
     private final EquipmentCategoryMapper categoryMapper;
+    private final EquipmentStockMapper stockMapper;
+    private final BorrowItemMapper borrowItemMapper;
+    private final ScrapItemMapper scrapItemMapper;
     private final StringRedisTemplate redisTemplate;
 
     @Override
@@ -83,6 +92,26 @@ public class EquipmentServiceImpl implements EquipmentService {
 
     @Override
     public void remove(Long id) {
+        Long stockCount = stockMapper.selectCount(Wrappers.<EquipmentStock>lambdaQuery()
+                .eq(EquipmentStock::getEquipmentId, id)
+                .apply("(quantity + locked_quantity) > 0"));
+        if (stockCount > 0) {
+            throw new BizException(ErrorCode.EQUIPMENT_IN_USE, "器材存在在库库存，无法删除");
+        }
+        Long borrowCount = borrowItemMapper.selectCount(Wrappers.<BorrowItem>lambdaQuery()
+                .eq(BorrowItem::getEquipmentId, id)
+                .inSql(BorrowItem::getBorrowId,
+                        "SELECT id FROM borrow_order WHERE status IN (0,1,2,3)"));
+        if (borrowCount > 0) {
+            throw new BizException(ErrorCode.EQUIPMENT_IN_USE, "器材存在未完结借用单，无法删除");
+        }
+        Long scrapCount = scrapItemMapper.selectCount(Wrappers.<ScrapItem>lambdaQuery()
+                .eq(ScrapItem::getEquipmentId, id)
+                .inSql(ScrapItem::getScrapId,
+                        "SELECT id FROM scrap_order WHERE status IN (0,1)"));
+        if (scrapCount > 0) {
+            throw new BizException(ErrorCode.EQUIPMENT_IN_USE, "器材存在未完结报废单，无法删除");
+        }
         equipmentMapper.deleteById(id);
     }
 
