@@ -80,6 +80,13 @@ npm run build
 - **冒烟脚本**：新增 Excel 导出检查（`-OutFile` 下载 + PK 头校验）。
 - **本地运维脚本**：`scripts/backup-db.ps1`（mysqldump 单事务备份到 `backups/`，已 gitignore）、`scripts/start-backend.ps1`（隐藏窗口后台启动后端）。
 
+### 7.2 高危缺陷修复（commit 15）
+
+- **H1 归还重复入账**：`ReturnServiceImpl` 创建时按借用明细聚合校验归还数量；确认时对 `borrow_item` 加行锁（`selectForUpdate`）并二次校验未还数量，杜绝两张待确认归还单/同单重复明细导致的重复加库存。
+- **H2 扣减忽略锁定库存**：新增 `EquipmentStockMapper.subtractAvailableQuantity`（`quantity - locked_quantity >= ?`）；报废处置与盘亏改走可用库存扣减；借用发放 `issue()` 在行锁内校验锁定数量足够后再扣减解锁。
+- **回归测试**：BorrowReturnTest +3（重复归还拦截、同单重复明细拦截、报废不占用锁定库存），StockTest +1（盘亏不占用锁定库存）；全量 40/40 通过。
+- **E2E 脚本**：`scripts/e2e-review.ps1` 已改为回归断言（主流程 + 两个缺陷的拦截验证），实测全部通过。
+
 ## 8. 已知注意事项（踩过的坑）
 
 1. **不要用子代理协作**：本会话子代理消息投递机制故障（任务消息丢失、子代理偏离任务），后续全部**内联执行**。
