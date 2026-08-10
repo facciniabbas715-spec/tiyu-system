@@ -17,6 +17,9 @@ public final class CacheConstants {
     /** 验证码有效期（分钟） */
     public static final long CAPTCHA_EXPIRATION_MINUTES = 5;
 
+    /** 器材编码流水键前缀：sportseq:equipment:code:{分类码}:{年} */
+    public static final String EQUIPMENT_CODE_KEY = "sportseq:equipment:code:";
+
     private CacheConstants() {
     }
 }
