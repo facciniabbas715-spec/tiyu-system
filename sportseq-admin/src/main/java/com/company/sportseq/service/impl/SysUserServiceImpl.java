@@ -95,6 +95,7 @@ public class SysUserServiceImpl implements SysUserService {
         userMapper.updateById(user);
         userRoleMapper.deleteByUserId(dto.getId());
         assignRoles(dto.getId(), dto.getRoleIds());
+        kickUserSessions(dto.getId());
     }
 
     @Override
@@ -105,6 +106,7 @@ public class SysUserServiceImpl implements SysUserService {
         }
         userMapper.deleteById(id);
         userRoleMapper.deleteByUserId(id);
+        kickUserSessions(id);
     }
 
     @Override
@@ -115,6 +117,7 @@ public class SysUserServiceImpl implements SysUserService {
         update.setLoginFailCount(0);
         update.setLockTime(null);
         userMapper.updateById(update);
+        kickUserSessions(dto.getUserId());
     }
 
     @Override
