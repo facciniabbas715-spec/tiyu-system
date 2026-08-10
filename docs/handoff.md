@@ -24,7 +24,7 @@
 develop 分支（worktree）已有 13 个提交，最近 5 个：
 
 ```text
-7c79186 feat: 统计分析模块（仪表盘汇总/报表图表/Excel导出）（commit 12）
+c4df795 feat: 统计分析模块（仪表盘汇总/报表图表/Excel导出）（commit 12）
 255c006 feat: 报废管理模块（申请/审核/处置出库）（commit 11）
 c77ff8d feat: 借用归还模块（库存锁定/领用/归还回补/逾期违约金）（commit 10）
 361b154 feat: 库存与入库模块（库存/流水/预警/调整、入库单全流程）（commit 9）
