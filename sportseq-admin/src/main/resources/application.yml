@@ -34,7 +34,11 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-# 阶段 3 引入：Redis、Spring Security
+# JWT 配置（生产环境务必通过环境变量覆盖 jwt.secret）
+jwt:
+  secret: sportseq-jwt-secret-key-please-change-in-production-0123456789abcdef
+  expiration: 7200
+
 # 阶段 5 引入：操作日志 AOP（@Log + LogAspect）
 
 # 阶段 2 引入：数据源、MyBatis-Plus、Druid、Flyway

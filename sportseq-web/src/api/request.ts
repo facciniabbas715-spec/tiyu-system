@@ -49,4 +49,12 @@ export function post<T = unknown>(url: string, data?: unknown, config?: AxiosReq
   return request.post(url, data, config).then((res) => (res.data as ApiResult<T>).data)
 }
 
+export function put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+  return request.put(url, data, config).then((res) => (res.data as ApiResult<T>).data)
+}
+
+export function del<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  return request.delete(url, config).then((res) => (res.data as ApiResult<T>).data)
+}
+
 export default request

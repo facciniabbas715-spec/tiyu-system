@@ -17,6 +17,7 @@ public enum ErrorCode {
     CAPTCHA_ERROR(2002, "验证码错误"),
     LOGIN_EXPIRED(2003, "登录已失效，请重新登录"),
     ACCOUNT_LOCKED(2004, "账号已锁定，请稍后再试"),
+    ACCOUNT_DISABLED(2005, "账号已停用，请联系管理员"),
 
     STOCK_NOT_ENOUGH(3001, "库存不足"),
     ORDER_STATUS_ERROR(3002, "当前单据状态不允许该操作"),
