@@ -5,6 +5,7 @@ import 'element-plus/dist/index.css'
 import App from './App.vue'
 import router from './router'
 import store from './store'
+import { permission } from './directives/permission'
 import '@/styles/index.scss'
 
 const app = createApp(App)
@@ -12,5 +13,6 @@ const app = createApp(App)
 app.use(store)
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })
+app.directive('permission', permission)
 
 app.mount('#app')

@@ -8,6 +8,7 @@ import cn.hutool.http.useragent.UserAgent;
 import cn.hutool.http.useragent.UserAgentUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.jsonwebtoken.Claims;
 import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
@@ -99,6 +100,7 @@ public class AuthServiceImpl implements AuthService {
                 CacheConstants.LOGIN_TOKEN_KEY + jti,
                 JSONUtil.toJsonStr(loginUser),
                 Duration.ofSeconds(tokenExpirationSeconds));
+        redisTemplate.opsForSet().add(CacheConstants.LOGIN_USER_KEY + user.getId(), jti);
 
         saveLoginLog(dto.getUsername(), request, true, "登录成功");
         return new LoginVO(token, toUserInfo(loginUser));
@@ -109,8 +111,13 @@ public class AuthServiceImpl implements AuthService {
         String token = resolveToken(request);
         if (StrUtil.isNotBlank(token)) {
             try {
-                String jti = jwtUtil.parseToken(token).getId();
+                Claims claims = jwtUtil.parseToken(token);
+                String jti = claims.getId();
+                Long userId = claims.get("userId", Long.class);
                 redisTemplate.delete(CacheConstants.LOGIN_TOKEN_KEY + jti);
+                if (userId != null) {
+                    redisTemplate.opsForSet().remove(CacheConstants.LOGIN_USER_KEY + userId, jti);
+                }
             } catch (Exception ignored) {
                 // token 已失效则无需清理
             }

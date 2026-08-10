@@ -8,6 +8,9 @@ public final class CacheConstants {
     /** 登录会话键前缀：sportseq:login:token:{jti} -> LoginUser JSON */
     public static final String LOGIN_TOKEN_KEY = "sportseq:login:token:";
 
+    /** 用户会话索引（Set 存 jti）：sportseq:login:user:{userId}，用于停用/踢出 */
+    public static final String LOGIN_USER_KEY = "sportseq:login:user:";
+
     /** 图形验证码键前缀：sportseq:captcha:{uuid} -> 验证码文本 */
     public static final String CAPTCHA_CODE_KEY = "sportseq:captcha:";
 

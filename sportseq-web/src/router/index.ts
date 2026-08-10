@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { setupRouterGuard } from './guard'
+import Layout from '@/layout/index.vue'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -8,12 +9,19 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/login/index.vue'),
     meta: { title: '登录' },
   },
-  { path: '/', redirect: '/login' },
   {
-    path: '/dashboard',
-    name: 'Dashboard',
-    component: () => import('@/views/dashboard/index.vue'),
-    meta: { title: '工作台' },
+    path: '/',
+    name: 'Root',
+    component: Layout,
+    redirect: '/dashboard',
+    children: [
+      {
+        path: 'dashboard',
+        name: 'Dashboard',
+        component: () => import('@/views/dashboard/index.vue'),
+        meta: { title: '工作台' },
+      },
+    ],
   },
   {
     path: '/:pathMatch(.*)*',

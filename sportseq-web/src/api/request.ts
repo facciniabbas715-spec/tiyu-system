@@ -9,6 +9,13 @@ export interface ApiResult<T = unknown> {
   traceId: string | null
 }
 
+export interface PageResult<T> {
+  total: number
+  current: number
+  size: number
+  records: T[]
+}
+
 const request = axios.create({
   baseURL: '/api',
   timeout: 15000,
