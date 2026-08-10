@@ -1,0 +1,14 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: sportseq-admin
+  profiles:
+    active: dev
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+
+# 阶段 2 引入：数据源、MyBatis-Plus、Druid、Flyway
+# 阶段 3 引入：Redis、Spring Security
