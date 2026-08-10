@@ -4,7 +4,15 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.dto.WarehouseDTO;
+import com.company.sportseq.entity.EquipmentStock;
+import com.company.sportseq.entity.ReturnOrder;
+import com.company.sportseq.entity.ScrapOrder;
+import com.company.sportseq.entity.StockInOrder;
 import com.company.sportseq.entity.Warehouse;
+import com.company.sportseq.mapper.EquipmentStockMapper;
+import com.company.sportseq.mapper.ReturnOrderMapper;
+import com.company.sportseq.mapper.ScrapOrderMapper;
+import com.company.sportseq.mapper.StockInOrderMapper;
 import com.company.sportseq.mapper.WarehouseMapper;
 import com.company.sportseq.service.WarehouseService;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +25,10 @@ import java.util.List;
 public class WarehouseServiceImpl implements WarehouseService {
 
     private final WarehouseMapper warehouseMapper;
+    private final EquipmentStockMapper stockMapper;
+    private final StockInOrderMapper stockInOrderMapper;
+    private final ReturnOrderMapper returnOrderMapper;
+    private final ScrapOrderMapper scrapOrderMapper;
 
     @Override
     public List<Warehouse> list() {
@@ -46,6 +58,26 @@ public class WarehouseServiceImpl implements WarehouseService {
 
     @Override
     public void remove(Long id) {
+        Long stockCount = stockMapper.selectCount(
+                Wrappers.<EquipmentStock>lambdaQuery().eq(EquipmentStock::getWarehouseId, id));
+        if (stockCount > 0) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "仓库存在库存记录，无法删除");
+        }
+        Long stockInCount = stockInOrderMapper.selectCount(
+                Wrappers.<StockInOrder>lambdaQuery().eq(StockInOrder::getWarehouseId, id));
+        if (stockInCount > 0) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "仓库存在入库单，无法删除");
+        }
+        Long returnCount = returnOrderMapper.selectCount(
+                Wrappers.<ReturnOrder>lambdaQuery().eq(ReturnOrder::getWarehouseId, id));
+        if (returnCount > 0) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "仓库存在归还单，无法删除");
+        }
+        Long scrapCount = scrapOrderMapper.selectCount(
+                Wrappers.<ScrapOrder>lambdaQuery().eq(ScrapOrder::getWarehouseId, id));
+        if (scrapCount > 0) {
+            throw new BizException(ErrorCode.PARAM_ERROR, "仓库存在报废单，无法删除");
+        }
         warehouseMapper.deleteById(id);
     }
 
