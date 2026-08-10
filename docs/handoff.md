@@ -11,7 +11,9 @@
 | 项 | 值 |
 | --- | --- |
 | 工作目录（开发） | `E:\codex——vibecoding works\体育器材管理系统\.worktrees\phase-01-scaffold`（git worktree，分支 develop） |
-| 主仓库 | `E:\codex——vibecoding works\体育器材管理系统`（main 分支，保持干净） |
+| 主仓库 | `E:\codex——vibecoding works\体育器材管理系统`（main 分支，已含完整快照） |
+| 远程仓库 | `origin = https://github.com/facciniabbas715-spec/tiyu-system.git`（公开，`main` 与标签 `v1.0.0` 已推送） |
+| 本机代理 | 本仓库已配置 `http.https://github.com.proxy = http://127.0.0.1:7897`（Clash Verge），push/pull 直连不通时走代理 |
 | JDK | Temurin 21.0.12 LTS，用户级 `JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`；**每个构建/启动命令前设置 `$env:JAVA_HOME`**（mvnw 用 JAVA_HOME） |
 | Maven | 项目自带 mvnw（`.\mvnw.cmd`），无全局 Maven |
 | MySQL | 8.0.45 @ localhost:3306；库 `sportseq`；账号 `sportseq` / `Sportseq@123`；root 密码 `061101` |
@@ -21,17 +23,9 @@
 
 ## 3. Git 状态
 
-develop 分支（worktree）已有 14 个提交，最近 5 个：
-
-```text
-7036697 feat: 本地联调加固（JWT环境变量/参数校验/报表索引/冒烟脚本）（commit 13）
-c4df795 feat: 统计分析模块（仪表盘汇总/报表图表/Excel导出）（commit 12）
-255c006 feat: 报废管理模块（申请/审核/处置出库）（commit 11）
-c77ff8d feat: 借用归还模块（库存锁定/领用/归还回补/逾期违约金）（commit 10）
-361b154 feat: 库存与入库模块（库存/流水/预警/调整、入库单全流程）（commit 9）
-```
-
-约定：commit 编号与主计划对应；阶段 11 按用户要求仅做本地联调加固（未上线、未打 tag v1.0.0）。全部工作提交在 develop；main 只接受 release 合并。
+- **2026-08-10 已做第一版存档**：`main` 已合并 develop 全部实现（311 个文件），打标签 `v1.0.0` 并推送到 GitHub 公开仓库 `facciniabbas715-spec/tiyu-system`。
+- `develop`（worktree）与 `main` 当前内容一致（develop 分支本身未推送远端，需要时再推）。
+- 约定：commit 编号与主计划对应；日常开发在 `develop` 提交，`main` 只接受 release 合并；后续大升级完成后合并回 `main` 并打新版本标签（如 `v1.1.0`）再推送。
 
 中危项处理提交：commit 18（用户会话踢出）、19（器材删除校验）、20（仓库删除校验）、21（admin 角色保护）、22（菜单成环校验）、23（借用分页 SQL 过滤）、24（列表 N+1 批量优化），详见第 11 节。
 
@@ -73,7 +67,7 @@ npm run build
 3. **冒烟脚本**：`scripts/smoke-test.ps1`（UTF-8 BOM）：健康检查 → 验证码登录（redis-cli 取码）→ 仪表盘/统计报表/业务列表 → 未认证 401。已验证全通过；前端 dev server（5173）代理 `/api → 8080` 联通。
 4. **文档**：README 更新为本地运行指南。
 
-> 后续若需要上线：再补 Docker/部署脚本、生产 profile、tag v1.0.0（原 commit 13 内容拆为新的独立提交）。
+> v1.0.0 已由用户在 2026-08-10 确认存档并推送到 GitHub（见第 3 节）；后续若需要上线：再补 Docker/部署脚本、生产 profile。
 
 ### 7.1 阶段 11 后维护（commit 14）
 
@@ -160,4 +154,4 @@ npm run build
 
 ## 10. 新会话启动语（建议）
 
-> 请读取 `docs/handoff.md`，然后在 develop 分支（worktree 路径见文档）按第 8 节清单处理中危项：逐项补测试、实现、提交；本地启动后端+前端后执行 `.\scripts\smoke-test.ps1` 冒烟。
+> 请先读取本仓库根目录的 `docs/handoff.md`、`README.md`，并执行 `git status`、`git log --oneline --graph -20`、`git tag` 确认当前状态；然后根据用户本次需求在 develop 分支（worktree 路径见第 2 节）推进；改动前后跑全量测试（`.\mvnw.cmd test`）与前端构建（`npm run type-check && npm run build`），完成后合并回 main 并打新版本标签推送 GitHub。
