@@ -7,9 +7,11 @@ import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
 import com.company.sportseq.dto.RoleDTO;
+import com.company.sportseq.entity.SysMenu;
 import com.company.sportseq.entity.SysRole;
 import com.company.sportseq.entity.SysRoleMenu;
 import com.company.sportseq.entity.SysUserRole;
+import com.company.sportseq.mapper.SysMenuMapper;
 import com.company.sportseq.mapper.SysRoleMapper;
 import com.company.sportseq.mapper.SysRoleMenuMapper;
 import com.company.sportseq.mapper.SysUserRoleMapper;
@@ -19,7 +21,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +32,7 @@ public class SysRoleServiceImpl implements SysRoleService {
     private final SysRoleMapper roleMapper;
     private final SysRoleMenuMapper roleMenuMapper;
     private final SysUserRoleMapper userRoleMapper;
+    private final SysMenuMapper menuMapper;
 
     @Override
     public PageResult<RoleVO> page(long current, long size, String roleName, Integer status) {
@@ -68,10 +73,23 @@ public class SysRoleServiceImpl implements SysRoleService {
         SysRole role = new SysRole();
         role.setId(dto.getId());
         role.setRoleName(dto.getRoleName());
-        role.setRoleKey(dto.getRoleKey());
+        if (dto.getId() == 1L) {
+            SysRole existing = roleMapper.selectById(1L);
+            if (existing == null) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "系统内置角色不存在");
+            }
+            if (!Objects.equals(existing.getRoleKey(), dto.getRoleKey())
+                    || !Objects.equals(existing.getStatus(), dto.getStatus())) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "系统内置角色不允许修改角色标识或状态");
+            }
+            role.setRoleKey(existing.getRoleKey());
+            role.setStatus(existing.getStatus());
+        } else {
+            role.setRoleKey(dto.getRoleKey());
+            role.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
+        }
         role.setRoleSort(dto.getRoleSort() == null ? 0 : dto.getRoleSort());
         role.setDataScope(dto.getDataScope() == null ? 1 : dto.getDataScope());
-        role.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         role.setRemark(dto.getRemark());
         roleMapper.updateById(role);
         roleMenuMapper.deleteByRoleId(dto.getId());
@@ -101,6 +119,14 @@ public class SysRoleServiceImpl implements SysRoleService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void assignMenus(Long roleId, List<Long> menuIds) {
+        if (roleId == 1L) {
+            List<Long> allMenuIds = menuMapper.selectList(null).stream()
+                    .map(SysMenu::getId)
+                    .toList();
+            if (menuIds == null || !new HashSet<>(menuIds).containsAll(allMenuIds)) {
+                throw new BizException(ErrorCode.PARAM_ERROR, "系统内置角色必须保留全部菜单权限");
+            }
+        }
         if (menuIds == null) {
             return;
         }
