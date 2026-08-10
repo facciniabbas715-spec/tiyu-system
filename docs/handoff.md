@@ -4,7 +4,7 @@
 
 ## 1. 一句话当前进度
 
-系统已完成阶段 0-9（脚手架、数据库、认证、权限、系统管理、器材基础、库存入库、借用归还、报废），后端 **32 个集成测试全绿**，前端构建通过；下一步是**阶段 10：统计分析**，然后是阶段 11（联调优化与上线）。
+系统已完成阶段 0-10（脚手架、数据库、认证、权限、系统管理、器材基础、库存入库、借用归还、报废、统计分析），后端 **35 个集成测试全绿**，前端构建通过；下一步是**阶段 11：联调优化与上线**。
 
 ## 2. 环境基线（重要）
 
@@ -21,17 +21,17 @@
 
 ## 3. Git 状态
 
-develop 分支（worktree）已有 12 个提交，最近 5 个：
+develop 分支（worktree）已有 13 个提交，最近 5 个：
 
 ```text
+7c79186 feat: 统计分析模块（仪表盘汇总/报表图表/Excel导出）（commit 12）
 255c006 feat: 报废管理模块（申请/审核/处置出库）（commit 11）
 c77ff8d feat: 借用归还模块（库存锁定/领用/归还回补/逾期违约金）（commit 10）
 361b154 feat: 库存与入库模块（库存/流水/预警/调整、入库单全流程）（commit 9）
 35262a2 feat: 器材基础资料模块（分类/器材档案/仓库、自动编码、Excel导入导出）（commit 8）
-e7f48e6 feat: 系统管理模块（字典/参数、操作日志AOP、日志查询页）（commit 7）
 ```
 
-约定：commit 编号与主计划对应（commit 12=统计分析，commit 13=联调上线，tag v1.0.0）。全部工作提交在 develop；main 只接受 release 合并。
+约定：commit 编号与主计划对应（commit 13=联调上线，tag v1.0.0）。全部工作提交在 develop；main 只接受 release 合并。
 
 ## 4. 架构速览
 
@@ -55,23 +55,20 @@ npm run type-check
 npm run build
 ```
 
-## 6. 下一步：阶段 10 统计分析（主计划 2026-08-10-体育器材管理系统-主计划.md）
+## 6. 阶段 10 统计分析（已完成，commit 12）
 
 实现内容：
 1. 后端 `StatisticService` + `/api/dashboard/summary`：今日借用/归还/入库数、库存预警数量、报废待审数、器材总数与库存总价值。
-2. 报表接口（ECharts 数据）：
-   - 库存分布（各分类器材数量，饼图）
-   - 借用趋势（近 12 个月借用/归还数量，折线图）
-   - 器材使用率 TOP 10（按借用次数）
-   - 部门借用统计、逾期统计（单数/平均天数/违约金合计）
-3. 报表 Excel 导出（EasyExcel，权限 `statistics:export`）。
-4. 前端：`dashboard/index.vue`（替换占位页，ECharts 卡片）、`statistics/index.vue`（报表页）。
-5. 提交 commit 12。
-6. 随后阶段 11：安全加固（生产密钥环境变量、参数校验复查）、性能检查、Docker/部署脚本、冒烟测试、tag v1.0.0。
+2. 报表接口（ECharts 数据）：`/api/statistics/category-stock`（分类饼图）、`/api/statistics/warehouse-stock`（仓库柱状图）、`/api/statistics/borrow-trend`（近 12 个月借用/归还折线，支持时间范围）、`/api/statistics/equipment-usage`（TOP 10）、`/api/statistics/dept-borrow`、`/api/statistics/overdue` + `/overdue/items`。
+3. 报表 Excel 导出 `/api/statistics/export?type=category|warehouse|trend|usage|dept|overdue`（EasyExcel，权限 `statistics:export`）。
+4. 前端：`dashboard/index.vue`（替换占位页：7 张汇总卡片 + 4 张 ECharts 图）、`statistics/index.vue`（报表页：时间筛选、趋势/排行图、部门表、逾期统计卡与明细表、导出下拉）。
+5. 聚合 SQL 位于 `resources/mapper/StatisticMapper.xml`；集成测试 `StatisticTest`（3 个用例，共 35 个全绿）。
 
-> 报表 SQL 建议用 MyBatis XML（`resources/mapper/`）写聚合查询；现有 `StatisticService` 尚未创建。
+## 7. 下一步：阶段 11 联调优化与上线
 
-## 7. 已知注意事项（踩过的坑）
+安全加固（生产密钥环境变量、参数校验复查）、性能检查、Docker/部署脚本、冒烟测试、tag v1.0.0（commit 13）。
+
+## 8. 已知注意事项（踩过的坑）
 
 1. **不要用子代理协作**：本会话子代理消息投递机制故障（任务消息丢失、子代理偏离任务），后续全部**内联执行**。
 2. **本机 shell 策略**：`Remove-Item`、`Start-Process`（含 cmd 包装）会被拦截；删除文件用 `apply_patch`，后台启动进程用 `.NET ProcessStartInfo`（`UseShellExecute=false, CreateNoWindow=true`，环境变量用 `$psi.Environment["JAVA_HOME"]=...`）。
@@ -84,6 +81,6 @@ npm run build
 9. **测试数据清理**：集成测试用 finally 物理清理（JdbcTemplate），避免残留导致断言失败。
 10. **中文编码**：PowerShell 控制台显示乱码是 GBK 显示问题，文件本身 UTF-8 正常；不要据此误判文件损坏。
 
-## 8. 新会话启动语（建议）
+## 9. 新会话启动语（建议）
 
 > 请读取 `docs/handoff.md`，然后在 develop 分支（worktree 路径见文档）按第 6 节继续实现阶段 10 统计分析模块，完成后提交 commit 12。

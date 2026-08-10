@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.company.sportseq.mapper.StatisticMapper">
+
+    <!-- 仪表盘汇总：今日业务量 / 库存预警 / 报废待审 / 器材总数 / 库存总价值 -->
+    <select id="summary" resultType="map">
+        SELECT
+            (SELECT COUNT(*) FROM borrow_order
+             WHERE del_flag = 0 AND status NOT IN (5, 6) AND DATE(create_time) = CURDATE()) AS todayBorrowCount,
+            (SELECT COUNT(*) FROM return_order
+             WHERE del_flag = 0 AND status NOT IN (2, 3) AND DATE(create_time) = CURDATE()) AS todayReturnCount,
+            (SELECT COUNT(*) FROM stock_in_order
+             WHERE del_flag = 0 AND status NOT IN (4, 5) AND DATE(create_time) = CURDATE()) AS todayStockInCount,
+            (SELECT COUNT(DISTINCT s.equipment_id) FROM equipment_stock s
+             JOIN equipment e ON e.id = s.equipment_id AND e.del_flag = 0
+             WHERE s.quantity &lt;= COALESCE(e.safe_stock, 0)) AS warningStockCount,
+            (SELECT COUNT(*) FROM scrap_order
+             WHERE del_flag = 0 AND status = 0) AS pendingScrapCount,
+            (SELECT COUNT(*) FROM equipment WHERE del_flag = 0) AS equipmentTotal,
+            (SELECT COALESCE(SUM(s.quantity * e.purchase_price), 0) FROM equipment_stock s
+             JOIN equipment e ON e.id = s.equipment_id AND e.del_flag = 0
+             WHERE e.purchase_price IS NOT NULL) AS stockTotalValue
+    </select>
+
+    <!-- 库存分布：各分类在库器材数量 -->
+    <select id="categoryStock" resultType="map">
+        SELECT COALESCE(c.category_name, '未分类') AS categoryName,
+               SUM(s.quantity) AS quantity
+        FROM equipment_stock s
+        JOIN equipment e ON e.id = s.equipment_id AND e.del_flag = 0
+        LEFT JOIN equipment_category c ON c.id = e.category_id
+        GROUP BY e.category_id, c.category_name
+        HAVING SUM(s.quantity) &gt; 0
+        ORDER BY quantity DESC
+    </select>
+
+    <!-- 各仓库库存量 -->
+    <select id="warehouseStock" resultType="map">
+        SELECT w.warehouse_name AS warehouseName,
+               SUM(s.quantity) AS quantity
+        FROM equipment_stock s
+        JOIN warehouse w ON w.id = s.warehouse_id AND w.del_flag = 0
+        GROUP BY s.warehouse_id, w.warehouse_name
+        HAVING SUM(s.quantity) &gt; 0
+        ORDER BY quantity DESC
+    </select>
+
+    <!-- 借用趋势：按月统计实际领用数量 -->
+    <select id="borrowTrendBorrow" resultType="map">
+        SELECT DATE_FORMAT(b.issue_time, '%Y-%m') AS month,
+               SUM(bi.issued_quantity) AS quantity
+        FROM borrow_item bi
+        JOIN borrow_order b ON b.id = bi.borrow_id AND b.del_flag = 0 AND b.status IN (2, 3, 4)
+        WHERE bi.issued_quantity &gt; 0 AND b.issue_time IS NOT NULL
+          AND (#{startDate} IS NULL OR DATE(b.issue_time) &gt;= #{startDate})
+          AND (#{endDate} IS NULL OR DATE(b.issue_time) &lt;= #{endDate})
+        GROUP BY DATE_FORMAT(b.issue_time, '%Y-%m')
+        ORDER BY month
+    </select>
+
+    <!-- 借用趋势：按月统计已确认归还数量 -->
+    <select id="borrowTrendReturn" resultType="map">
+        SELECT DATE_FORMAT(r.confirm_time, '%Y-%m') AS month,
+               SUM(ri.quantity) AS quantity
+        FROM return_item ri
+        JOIN return_order r ON r.id = ri.return_id AND r.del_flag = 0 AND r.status = 1
+        WHERE r.confirm_time IS NOT NULL
+          AND (#{startDate} IS NULL OR DATE(r.confirm_time) &gt;= #{startDate})
+          AND (#{endDate} IS NULL OR DATE(r.confirm_time) &lt;= #{endDate})
+        GROUP BY DATE_FORMAT(r.confirm_time, '%Y-%m')
+        ORDER BY month
+    </select>
+
+    <!-- 器材使用率 TOP N：按借用次数排序 -->
+    <select id="equipmentUsageTop" resultType="map">
+        SELECT e.equipment_code AS equipmentCode,
+               e.equipment_name AS equipmentName,
+               c.category_name AS categoryName,
+               COUNT(DISTINCT bi.id) AS borrowCount
+        FROM borrow_item bi
+        JOIN borrow_order b ON b.id = bi.borrow_id AND b.del_flag = 0 AND b.status IN (2, 3, 4)
+        JOIN equipment e ON e.id = bi.equipment_id AND e.del_flag = 0
+        LEFT JOIN equipment_category c ON c.id = e.category_id
+        WHERE bi.issued_quantity &gt; 0 AND b.issue_time IS NOT NULL
+          AND (#{startDate} IS NULL OR DATE(b.issue_time) &gt;= #{startDate})
+          AND (#{endDate} IS NULL OR DATE(b.issue_time) &lt;= #{endDate})
+        GROUP BY e.id, e.equipment_code, e.equipment_name, c.category_name
+        ORDER BY borrowCount DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 部门借用统计 -->
+    <select id="deptBorrowStats" resultType="map">
+        SELECT COALESCE(d.dept_name, '未知部门') AS deptName,
+               COUNT(DISTINCT b.id) AS borrowCount,
+               SUM(bi.issued_quantity) AS borrowQuantity,
+               SUM(CASE WHEN bi.status IN (1, 2, 3)
+                        THEN bi.issued_quantity - bi.returned_quantity ELSE 0 END) AS outstandingQuantity
+        FROM borrow_item bi
+        JOIN borrow_order b ON b.id = bi.borrow_id AND b.del_flag = 0 AND b.status IN (2, 3, 4)
+        LEFT JOIN sys_dept d ON d.id = b.dept_id
+        WHERE bi.issued_quantity &gt; 0 AND b.issue_time IS NOT NULL
+          AND (#{startDate} IS NULL OR DATE(b.issue_time) &gt;= #{startDate})
+          AND (#{endDate} IS NULL OR DATE(b.issue_time) &lt;= #{endDate})
+        GROUP BY b.dept_id, d.dept_name
+        ORDER BY borrowCount DESC, borrowQuantity DESC
+    </select>
+
+    <!-- 逾期明细：已确认归还单中的逾期条目 -->
+    <select id="overdueItems" resultType="map">
+        SELECT r.order_no AS returnOrderNo,
+               b.order_no AS borrowOrderNo,
+               e.equipment_code AS equipmentCode,
+               e.equipment_name AS equipmentName,
+               ri.quantity AS quantity,
+               ri.overdue_days AS overdueDays,
+               ri.penalty_amount AS penaltyAmount,
+               r.confirm_time AS confirmTime
+        FROM return_item ri
+        JOIN return_order r ON r.id = ri.return_id AND r.del_flag = 0 AND r.status = 1
+        JOIN borrow_order b ON b.id = r.borrow_order_id
+        LEFT JOIN equipment e ON e.id = ri.equipment_id
+        WHERE ri.is_overdue = 1 AND ri.overdue_days &gt; 0
+          AND (#{startDate} IS NULL OR DATE(r.confirm_time) &gt;= #{startDate})
+          AND (#{endDate} IS NULL OR DATE(r.confirm_time) &lt;= #{endDate})
+        ORDER BY r.confirm_time DESC, ri.id DESC
+    </select>
+
+</mapper>
