@@ -2,6 +2,7 @@ package com.company.sportseq.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -20,5 +21,7 @@ public class ReturnItemDTO {
     private Integer conditionStatus;
 
     private String damageDesc;
+
+    @DecimalMin(value = "0", message = "违约金/赔偿金额不能为负")
     private BigDecimal penaltyAmount;
 }

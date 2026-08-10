@@ -34,10 +34,10 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
-# JWT 配置（生产环境务必通过环境变量覆盖 jwt.secret）
+# JWT 配置：生产/正式环境务必通过环境变量 JWT_SECRET 覆盖默认值
 jwt:
-  secret: sportseq-jwt-secret-key-please-change-in-production-0123456789abcdef
-  expiration: 7200
+  secret: ${JWT_SECRET:sportseq-jwt-secret-key-please-change-in-production-0123456789abcdef}
+  expiration: ${JWT_EXPIRATION:7200}
 
 # 阶段 5 引入：操作日志 AOP（@Log + LogAspect）
 
