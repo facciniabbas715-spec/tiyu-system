@@ -16,6 +16,11 @@
       <el-table-column prop="roleName" label="角色名称" width="150" />
       <el-table-column prop="roleKey" label="权限字符" width="180" />
       <el-table-column prop="roleSort" label="排序" width="70" />
+      <el-table-column label="数据范围" width="110">
+        <template #default="{ row }">
+          {{ scopeMap[row.dataScope] ?? '全部数据' }}
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="80">
         <template #default="{ row }">
           <el-tag :type="row.status === 1 ? 'success' : 'danger'">
@@ -59,6 +64,16 @@
         </el-form-item>
         <el-form-item label="显示排序">
           <el-input-number v-model="form.roleSort" :min="0" />
+        </el-form-item>
+        <el-form-item label="数据范围">
+          <el-select v-model="form.dataScope" style="width: 100%">
+            <el-option
+              v-for="(label, value) in scopeMap"
+              :key="value"
+              :label="label"
+              :value="Number(value)"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="状态">
           <el-switch v-model="form.status" :active-value="1" :inactive-value="0" />
@@ -122,7 +137,14 @@ const formRef = ref<FormInstance>()
 const menuTreeRef = ref<InstanceType<typeof ElTree>>()
 const currentRole = ref<RoleItem | null>(null)
 
-const defaultForm = (): RoleDTO => ({ roleName: '', roleKey: '', roleSort: 0, status: 1 })
+const scopeMap: Record<number, string> = {
+  1: '全部数据',
+  2: '本部门',
+  3: '本部门及以下',
+  4: '仅本人',
+}
+
+const defaultForm = (): RoleDTO => ({ roleName: '', roleKey: '', roleSort: 0, dataScope: 1, status: 1 })
 const form = reactive<RoleDTO>(defaultForm())
 
 const rules: FormRules = {

@@ -27,12 +27,14 @@ import com.company.sportseq.mapper.StockRecordMapper;
 import com.company.sportseq.mapper.SysUserMapper;
 import com.company.sportseq.mapper.WarehouseMapper;
 import com.company.sportseq.security.SecurityUtils;
+import com.company.sportseq.service.DataScopeService;
 import com.company.sportseq.service.ReturnService;
 import com.company.sportseq.service.SysConfigService;
 import com.company.sportseq.vo.ReturnItemVO;
 import com.company.sportseq.vo.ReturnOrderVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -63,14 +67,16 @@ public class ReturnServiceImpl implements ReturnService {
     private final SysUserMapper userMapper;
     private final SysConfigService configService;
     private final StringRedisTemplate redisTemplate;
+    private final DataScopeService dataScopeService;
 
     @Override
     public PageResult<ReturnOrderVO> page(long current, long size, String orderNo, Integer status) {
-        Page<ReturnOrder> page = returnOrderMapper.selectPage(new Page<>(current, size),
-                Wrappers.<ReturnOrder>lambdaQuery()
-                        .like(StrUtil.isNotBlank(orderNo), ReturnOrder::getOrderNo, orderNo)
-                        .eq(status != null, ReturnOrder::getStatus, status)
-                        .orderByDesc(ReturnOrder::getCreateTime));
+        var wrapper = Wrappers.<ReturnOrder>lambdaQuery()
+                .like(StrUtil.isNotBlank(orderNo), ReturnOrder::getOrderNo, orderNo)
+                .eq(status != null, ReturnOrder::getStatus, status);
+        applyDataScope(wrapper);
+        wrapper.orderByDesc(ReturnOrder::getCreateTime);
+        Page<ReturnOrder> page = returnOrderMapper.selectPage(new Page<>(current, size), wrapper);
         List<ReturnOrderVO> records = page.getRecords().stream().map(this::toVo).toList();
         return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
@@ -78,6 +84,7 @@ public class ReturnServiceImpl implements ReturnService {
     @Override
     public ReturnOrderVO detail(Long id) {
         ReturnOrder order = getOrder(id);
+        checkDataScope(order);
         return toVo(order);
     }
 
@@ -165,6 +172,7 @@ public class ReturnServiceImpl implements ReturnService {
     @Transactional(rollbackFor = Exception.class)
     public void confirm(Long id) {
         ReturnOrder order = getOrder(id);
+        checkDataScope(order);
         if (order.getStatus() != STATUS_PENDING) {
             throw new BizException(ErrorCode.ORDER_STATUS_ERROR, "仅待确认状态可验收");
         }
@@ -249,6 +257,7 @@ public class ReturnServiceImpl implements ReturnService {
     @Override
     public void reject(Long id) {
         ReturnOrder order = getOrder(id);
+        checkDataScope(order);
         if (order.getStatus() != STATUS_PENDING) {
             throw new BizException(ErrorCode.ORDER_STATUS_ERROR, "仅待确认状态可驳回");
         }
@@ -269,6 +278,47 @@ public class ReturnServiceImpl implements ReturnService {
             throw new BizException(ErrorCode.PARAM_ERROR, "归还单不存在");
         }
         return order;
+    }
+
+    private void applyDataScope(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ReturnOrder> wrapper) {
+        if (dataScopeService.isFullScope()) {
+            return;
+        }
+        if (dataScopeService.isSelfOnly()) {
+            wrapper.eq(ReturnOrder::getUserId, dataScopeService.currentUserId());
+            return;
+        }
+        Set<Long> userIds = allowedUserIds();
+        if (userIds.isEmpty()) {
+            wrapper.apply("1 = 0");
+        } else {
+            wrapper.in(ReturnOrder::getUserId, userIds);
+        }
+    }
+
+    private void checkDataScope(ReturnOrder order) {
+        if (dataScopeService.isFullScope()) {
+            return;
+        }
+        if (dataScopeService.isSelfOnly()) {
+            if (!dataScopeService.currentUserId().equals(order.getUserId())) {
+                throw new AccessDeniedException("无权限访问该归还单");
+            }
+            return;
+        }
+        if (!allowedUserIds().contains(order.getUserId())) {
+            throw new AccessDeniedException("无权限访问该归还单");
+        }
+    }
+
+    private Set<Long> allowedUserIds() {
+        Set<Long> deptIds = dataScopeService.allowedDeptIds();
+        if (deptIds.isEmpty()) {
+            return Set.of();
+        }
+        return userMapper.selectList(
+                        Wrappers.<SysUser>lambdaQuery().in(SysUser::getDeptId, deptIds))
+                .stream().map(SysUser::getId).collect(Collectors.toSet());
     }
 
     private ReturnOrderVO toVo(ReturnOrder order) {

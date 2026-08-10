@@ -7,6 +7,7 @@ public record RoleVO(
         String roleName,
         String roleKey,
         Integer roleSort,
+        Integer dataScope,
         Integer status,
         String remark,
         LocalDateTime createTime

@@ -26,11 +26,13 @@ import com.company.sportseq.mapper.StockRecordMapper;
 import com.company.sportseq.entity.StockRecord;
 import com.company.sportseq.security.SecurityUtils;
 import com.company.sportseq.service.BorrowService;
+import com.company.sportseq.service.DataScopeService;
 import com.company.sportseq.service.SysConfigService;
 import com.company.sportseq.vo.BorrowItemVO;
 import com.company.sportseq.vo.BorrowOrderVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +40,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -61,16 +64,18 @@ public class BorrowServiceImpl implements BorrowService {
     private final StockRecordMapper recordMapper;
     private final SysConfigService configService;
     private final StringRedisTemplate redisTemplate;
+    private final DataScopeService dataScopeService;
 
     @Override
     public PageResult<BorrowOrderVO> page(long current, long size, String orderNo, String username,
                                           Integer status, Long borrowUserId) {
-        Page<BorrowOrder> page = orderMapper.selectPage(new Page<>(current, size),
-                Wrappers.<BorrowOrder>lambdaQuery()
-                        .like(StrUtil.isNotBlank(orderNo), BorrowOrder::getOrderNo, orderNo)
-                        .eq(status != null, BorrowOrder::getStatus, status)
-                        .eq(borrowUserId != null, BorrowOrder::getUserId, borrowUserId)
-                        .orderByDesc(BorrowOrder::getCreateTime));
+        var wrapper = Wrappers.<BorrowOrder>lambdaQuery()
+                .like(StrUtil.isNotBlank(orderNo), BorrowOrder::getOrderNo, orderNo)
+                .eq(status != null, BorrowOrder::getStatus, status)
+                .eq(borrowUserId != null, BorrowOrder::getUserId, borrowUserId);
+        applyDataScope(wrapper);
+        wrapper.orderByDesc(BorrowOrder::getCreateTime);
+        Page<BorrowOrder> page = orderMapper.selectPage(new Page<>(current, size), wrapper);
         List<BorrowOrderVO> records = page.getRecords().stream()
                 .filter(order -> StrUtil.isBlank(username) || StrUtil.containsIgnoreCase(
                         fetchUser(order.getUserId()).getUsername(), username))
@@ -87,6 +92,7 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     public BorrowOrderVO detail(Long id) {
         BorrowOrder order = getOrder(id);
+        checkDataScope(order);
         return toVo(order);
     }
 
@@ -136,6 +142,7 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     public void audit(BorrowAuditDTO dto) {
         BorrowOrder order = getOrder(dto.getOrderId());
+        checkDataScope(order);
         checkStatus(order, STATUS_PENDING, "待审核状态才能审核");
         Long userId = SecurityUtils.getUserId();
         BorrowOrder update = new BorrowOrder();
@@ -154,6 +161,7 @@ public class BorrowServiceImpl implements BorrowService {
     @Transactional(rollbackFor = Exception.class)
     public void issue(Long id) {
         BorrowOrder order = getOrder(id);
+        checkDataScope(order);
         checkStatus(order, STATUS_APPROVED, "审核通过后才能领用");
         Long userId = SecurityUtils.getUserId();
         List<BorrowItem> items = loadItems(order.getId());
@@ -201,6 +209,7 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     public void extend(BorrowExtendDTO dto) {
         BorrowOrder order = getOrder(dto.getOrderId());
+        checkDataScope(order);
         checkStatus(order, STATUS_BORROWED, "借用中才能续借");
         String limitStr = configService.getValueByKey("borrow.extend.limit");
         int limit = limitStr == null ? 1 : Integer.parseInt(limitStr);
@@ -222,6 +231,7 @@ public class BorrowServiceImpl implements BorrowService {
     @Transactional(rollbackFor = Exception.class)
     public void cancel(Long id) {
         BorrowOrder order = getOrder(id);
+        checkDataScope(order);
         checkStatus(order, STATUS_PENDING, "仅待审核状态可取消");
         unlockItems(order.getId(), SecurityUtils.getUserId());
         BorrowOrder update = new BorrowOrder();
@@ -256,6 +266,38 @@ public class BorrowServiceImpl implements BorrowService {
     private void checkStatus(BorrowOrder order, int expected, String message) {
         if (order.getStatus() != expected) {
             throw new BizException(ErrorCode.ORDER_STATUS_ERROR, message);
+        }
+    }
+
+    private void applyDataScope(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<BorrowOrder> wrapper) {
+        if (dataScopeService.isFullScope()) {
+            return;
+        }
+        if (dataScopeService.isSelfOnly()) {
+            wrapper.eq(BorrowOrder::getUserId, dataScopeService.currentUserId());
+            return;
+        }
+        Set<Long> deptIds = dataScopeService.allowedDeptIds();
+        if (deptIds.isEmpty()) {
+            wrapper.apply("1 = 0");
+        } else {
+            wrapper.in(BorrowOrder::getDeptId, deptIds);
+        }
+    }
+
+    private void checkDataScope(BorrowOrder order) {
+        if (dataScopeService.isFullScope()) {
+            return;
+        }
+        if (dataScopeService.isSelfOnly()) {
+            if (!dataScopeService.currentUserId().equals(order.getUserId())) {
+                throw new AccessDeniedException("无权限访问该借用单");
+            }
+            return;
+        }
+        Set<Long> deptIds = dataScopeService.allowedDeptIds();
+        if (order.getDeptId() == null || !deptIds.contains(order.getDeptId())) {
+            throw new AccessDeniedException("无权限访问该借用单");
         }
     }
 

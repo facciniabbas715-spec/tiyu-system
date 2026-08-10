@@ -38,7 +38,7 @@ public class SysRoleServiceImpl implements SysRoleService {
                         .orderByAsc(SysRole::getRoleSort));
         List<RoleVO> records = page.getRecords().stream()
                 .map(r -> new RoleVO(r.getId(), r.getRoleName(), r.getRoleKey(), r.getRoleSort(),
-                        r.getStatus(), r.getRemark(), r.getCreateTime()))
+                        r.getDataScope(), r.getStatus(), r.getRemark(), r.getCreateTime()))
                 .toList();
         return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
@@ -51,6 +51,7 @@ public class SysRoleServiceImpl implements SysRoleService {
         role.setRoleName(dto.getRoleName());
         role.setRoleKey(dto.getRoleKey());
         role.setRoleSort(dto.getRoleSort() == null ? 0 : dto.getRoleSort());
+        role.setDataScope(dto.getDataScope() == null ? 1 : dto.getDataScope());
         role.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         role.setRemark(dto.getRemark());
         roleMapper.insert(role);
@@ -69,6 +70,7 @@ public class SysRoleServiceImpl implements SysRoleService {
         role.setRoleName(dto.getRoleName());
         role.setRoleKey(dto.getRoleKey());
         role.setRoleSort(dto.getRoleSort() == null ? 0 : dto.getRoleSort());
+        role.setDataScope(dto.getDataScope() == null ? 1 : dto.getDataScope());
         role.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         role.setRemark(dto.getRemark());
         roleMapper.updateById(role);

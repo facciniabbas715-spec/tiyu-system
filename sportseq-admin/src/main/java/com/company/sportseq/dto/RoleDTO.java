@@ -22,6 +22,7 @@ public class RoleDTO {
     private String roleKey;
 
     private Integer roleSort;
+    private Integer dataScope;
     private Integer status;
     private String remark;
     private List<Long> menuIds;

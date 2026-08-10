@@ -17,10 +17,12 @@ import com.company.sportseq.mapper.SysDeptMapper;
 import com.company.sportseq.mapper.SysUserMapper;
 import com.company.sportseq.mapper.SysUserRoleMapper;
 import com.company.sportseq.security.SecurityUtils;
+import com.company.sportseq.service.DataScopeService;
 import com.company.sportseq.service.SysUserService;
 import com.company.sportseq.vo.UserVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,17 +40,19 @@ public class SysUserServiceImpl implements SysUserService {
     private final SysUserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
     private final StringRedisTemplate redisTemplate;
+    private final DataScopeService dataScopeService;
 
     @Override
     public PageResult<UserVO> page(long current, long size, String username, String phone,
                                    Integer status, Long deptId) {
-        Page<SysUser> page = userMapper.selectPage(new Page<>(current, size),
-                Wrappers.<SysUser>lambdaQuery()
-                        .like(StrUtil.isNotBlank(username), SysUser::getUsername, username)
-                        .like(StrUtil.isNotBlank(phone), SysUser::getPhone, phone)
-                        .eq(status != null, SysUser::getStatus, status)
-                        .eq(deptId != null, SysUser::getDeptId, deptId)
-                        .orderByDesc(SysUser::getCreateTime));
+        var wrapper = Wrappers.<SysUser>lambdaQuery()
+                .like(StrUtil.isNotBlank(username), SysUser::getUsername, username)
+                .like(StrUtil.isNotBlank(phone), SysUser::getPhone, phone)
+                .eq(status != null, SysUser::getStatus, status)
+                .eq(deptId != null, SysUser::getDeptId, deptId);
+        applyDataScope(wrapper);
+        wrapper.orderByDesc(SysUser::getCreateTime);
+        Page<SysUser> page = userMapper.selectPage(new Page<>(current, size), wrapper);
         List<UserVO> records = page.getRecords().stream().map(this::toVo).toList();
         return new PageResult<>(page.getTotal(), page.getCurrent(), page.getSize(), records);
     }
@@ -59,6 +63,7 @@ public class SysUserServiceImpl implements SysUserService {
         if (user == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "用户不存在");
         }
+        checkDataScope(user);
         return toVo(user);
     }
 
@@ -134,6 +139,38 @@ public class SysUserServiceImpl implements SysUserService {
             }
         }
         redisTemplate.delete(CacheConstants.LOGIN_USER_KEY + userId);
+    }
+
+    private void applyDataScope(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysUser> wrapper) {
+        if (dataScopeService.isFullScope()) {
+            return;
+        }
+        if (dataScopeService.isSelfOnly()) {
+            wrapper.eq(SysUser::getId, dataScopeService.currentUserId());
+            return;
+        }
+        Set<Long> deptIds = dataScopeService.allowedDeptIds();
+        if (deptIds.isEmpty()) {
+            wrapper.apply("1 = 0");
+        } else {
+            wrapper.in(SysUser::getDeptId, deptIds);
+        }
+    }
+
+    private void checkDataScope(SysUser target) {
+        if (dataScopeService.isFullScope()) {
+            return;
+        }
+        if (dataScopeService.isSelfOnly()) {
+            if (!dataScopeService.currentUserId().equals(target.getId())) {
+                throw new AccessDeniedException("无权限查看该用户");
+            }
+            return;
+        }
+        Set<Long> deptIds = dataScopeService.allowedDeptIds();
+        if (target.getDeptId() == null || !deptIds.contains(target.getDeptId())) {
+            throw new AccessDeniedException("无权限查看该用户");
+        }
     }
 
     private void checkUsernameUnique(String username, Long excludeId) {

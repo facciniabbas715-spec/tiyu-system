@@ -6,6 +6,7 @@ export interface RoleItem {
   roleName: string
   roleKey: string
   roleSort: number
+  dataScope: number
   status: number
   remark: string | null
   createTime: string
@@ -16,6 +17,7 @@ export interface RoleDTO {
   roleName: string
   roleKey: string
   roleSort?: number
+  dataScope?: number
   status?: number
   remark?: string
   menuIds?: number[]
