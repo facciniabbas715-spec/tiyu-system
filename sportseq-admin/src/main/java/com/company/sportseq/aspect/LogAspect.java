@@ -7,6 +7,8 @@ import com.company.sportseq.common.utils.IpUtils;
 import com.company.sportseq.entity.SysOperLog;
 import com.company.sportseq.mapper.SysOperLogMapper;
 import com.company.sportseq.security.LoginUser;
+import jakarta.servlet.ServletRequest;
+import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +22,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.io.OutputStream;
+import java.io.Writer;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 /**
  * 操作日志切面：@Log 方法执行前后采集信息，异步写入 sys_oper_log。
@@ -43,7 +48,9 @@ public class LogAspect {
         try {
             Object result = point.proceed();
             operLog.setStatus(0);
-            operLog.setJsonResult(StrUtil.sub(maskSensitive(JSONUtil.toJsonStr(result)), 0, MAX_TEXT_LENGTH));
+            if (result != null) {
+                operLog.setJsonResult(StrUtil.sub(maskSensitive(JSONUtil.toJsonStr(result)), 0, MAX_TEXT_LENGTH));
+            }
             return result;
         } catch (Throwable e) {
             operLog.setStatus(1);
@@ -83,7 +90,16 @@ public class LogAspect {
             operLog.setOperIp(IpUtils.getClientIp(request));
             Object[] args = point.getArgs();
             if (args != null && args.length > 0) {
-                operLog.setOperParam(StrUtil.sub(maskSensitive(JSONUtil.toJsonStr(args)), 0, MAX_TEXT_LENGTH));
+                Object[] loggableArgs = Arrays.stream(args)
+                        .filter(arg -> !(arg instanceof ServletRequest)
+                                && !(arg instanceof ServletResponse)
+                                && !(arg instanceof OutputStream)
+                                && !(arg instanceof Writer))
+                        .toArray();
+                if (loggableArgs.length > 0) {
+                    operLog.setOperParam(
+                            StrUtil.sub(maskSensitive(JSONUtil.toJsonStr(loggableArgs)), 0, MAX_TEXT_LENGTH));
+                }
             }
         }
     }

@@ -176,6 +176,27 @@ class StatisticTest {
         }
     }
 
+    @Test
+    void exportLog_shouldSkipServletResponse() throws Exception {
+        String token = loginAdmin();
+        try {
+            mockMvc.perform(get("/api/statistics/export")
+                            .header("Authorization", "Bearer " + token)
+                            .param("type", "usage"))
+                    .andReturn();
+            Thread.sleep(500); // 等待异步日志落库
+            String param = jdbcTemplate.queryForObject(
+                    "SELECT oper_param FROM sys_oper_log WHERE title = '统计报表导出' ORDER BY id DESC LIMIT 1",
+                    String.class);
+            if (param == null || param.length() > 500 || param.contains("PK") || !param.contains("usage")) {
+                throw new AssertionError("操作日志不应包含二进制导出内容: " + param);
+            }
+        } finally {
+            jdbcTemplate.update(
+                    "DELETE FROM sys_oper_log WHERE title = '统计报表导出' AND oper_param LIKE '%usage%'");
+        }
+    }
+
     private void seed() {
         long catA = insertCategory(CAT_A, "统计测试-球类");
         long catB = insertCategory(CAT_B, "统计测试-田径");

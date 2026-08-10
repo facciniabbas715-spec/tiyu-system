@@ -125,6 +125,21 @@ Check 'GET /api/statistics/overdue' {
     if ($r.code -ne 0 -or $null -eq $r.data.penaltyTotal) { throw '逾期统计返回异常' }
 }
 
+Check 'GET /api/statistics/export（Excel 导出）' {
+    $tmp = Join-Path $env:TEMP "sportseq-smoke-export-$([guid]::NewGuid().ToString('N')).xlsx"
+    Invoke-RestMethod -Uri "$BaseUrl/api/statistics/export?type=usage" `
+        -Headers @{ Authorization = "Bearer $($script:token)" } -OutFile $tmp -TimeoutSec 20
+    $file = Get-Item -LiteralPath $tmp
+    if ($file.Length -lt 1000) { throw '导出文件过小' }
+    $head = [System.IO.File]::ReadAllBytes($tmp)[0..1]
+    if (-not ($head[0] -eq 80 -and $head[1] -eq 75)) { throw '导出文件不是有效 xlsx（缺少 PK 头）' }
+    try {
+        [System.IO.File]::Delete($tmp)
+    } catch {
+        Write-Host "    提示：临时文件清理失败：$tmp" -ForegroundColor Yellow
+    }
+}
+
 Check 'GET /api/equipment/page' {
     $r = Get-Api '/api/equipment/page?current=1&size=5'
     if ($r.code -ne 0 -or $null -eq $r.data.records) { throw '器材分页返回异常' }

@@ -203,8 +203,16 @@ function renderUsage(rows: EquipmentUsageItem[]) {
 }
 
 async function handleExport(type: string) {
+  const labels: Record<string, string> = {
+    category: '库存分布',
+    warehouse: '各仓库库存',
+    trend: '借用趋势',
+    usage: '器材使用率',
+    dept: '部门借用统计',
+    overdue: '逾期明细',
+  }
   try {
-    await downloadFile(statisticsExportUrl(type, rangeParams()), `统计报表-${type}.xlsx`)
+    await downloadFile(statisticsExportUrl(type, rangeParams()), `${labels[type] ?? type}.xlsx`)
     ElMessage.success('导出成功')
   } catch {
     ElMessage.error('导出失败')

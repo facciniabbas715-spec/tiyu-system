@@ -28,6 +28,7 @@ logs/
 *.log
 temp/
 *.tmp
+backups/
 
 # ---------- Environment / Secrets ----------
 .env
