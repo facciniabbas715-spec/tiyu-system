@@ -40,12 +40,28 @@ public class PermissionAwareToolCallback implements ToolCallback {
     @Override
     public String call(String toolInput) {
         String denyMessage = permissionService.denyMessage(permission);
-        return denyMessage != null ? denyMessage : delegate.call(toolInput);
+        if (denyMessage != null) {
+            AiToolTrace.recordCall(name(), toolInput, denyMessage);
+            return denyMessage;
+        }
+        String result = delegate.call(toolInput);
+        AiToolTrace.recordCall(name(), toolInput, result);
+        return result;
     }
 
     @Override
     public String call(String toolInput, ToolContext toolContext) {
         String denyMessage = permissionService.denyMessage(permission);
-        return denyMessage != null ? denyMessage : delegate.call(toolInput, toolContext);
+        if (denyMessage != null) {
+            AiToolTrace.recordCall(name(), toolInput, denyMessage);
+            return denyMessage;
+        }
+        String result = delegate.call(toolInput, toolContext);
+        AiToolTrace.recordCall(name(), toolInput, result);
+        return result;
+    }
+
+    private String name() {
+        return delegate.getToolDefinition().name();
     }
 }

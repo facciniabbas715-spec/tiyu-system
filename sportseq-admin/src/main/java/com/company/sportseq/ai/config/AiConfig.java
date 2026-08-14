@@ -3,13 +3,16 @@ package com.company.sportseq.ai.config;
 import com.company.sportseq.ai.exception.AiNotConfiguredException;
 import com.company.sportseq.ai.tool.AiToolsProperties;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.model.SimpleApiKey;
+import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -54,9 +57,15 @@ public class AiConfig {
     }
 
     @Bean
-    public ChatClient aiChatClient(ChatModel chatModel, AiProperties properties) {
+    public ChatClient aiChatClient(ChatModel chatModel, AiProperties properties,
+                                   ObjectProvider<ToolCallingManager> toolCallingManagerProvider) {
+        ToolCallingManager toolCallingManager = toolCallingManagerProvider.getIfAvailable(
+                () -> ToolCallingManager.builder().build());
         return ChatClient.builder(chatModel)
                 .defaultSystem(properties.getChat().getSystemPrompt())
+                .defaultAdvisors(ToolCallAdvisor.builder()
+                        .toolCallingManager(toolCallingManager)
+                        .build())
                 .build();
     }
 

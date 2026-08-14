@@ -6,7 +6,7 @@
           <div class="chat-header__left">
             <el-icon class="chat-header__icon"><ChatDotRound /></el-icon>
             <span class="chat-header__title">AI 智能客服</span>
-            <el-tag size="small" type="success">已接入知识库 · RAG</el-tag>
+            <el-tag size="small" type="success">已接入知识库 · RAG + 业务数据</el-tag>
           </div>
           <el-button :disabled="loading" @click="clearChat">
             <el-icon><Delete /></el-icon>
@@ -38,15 +38,22 @@
             <el-collapse v-if="msg.role === 'assistant' && !msg.loading && msg.debug" class="rag-debug">
               <el-collapse-item name="debug">
                 <template #title>
-                  <span class="rag-debug__title">RAG 检索详情（开发环境）</span>
+                  <span class="rag-debug__title">AI 处理详情（开发环境）</span>
                 </template>
                 <div class="rag-debug__query">问题：{{ msg.debug.query }}</div>
                 <div class="rag-debug__meta">
-                  知识库命中：{{ msg.debug.knowledgeUsed ? '是' : '否' }} · topK={{ msg.debug.topK }} ·
-                  阈值={{ msg.debug.similarityThreshold }}
+                  意图：{{ intentLabel(msg.debug.intent) }} ·
+                  知识库命中：{{ msg.debug.knowledgeUsed ? '是' : '否' }}
+                </div>
+                <div v-if="msg.debug.toolCalls.length > 0" class="rag-debug__tools">
+                  <div v-for="(call, index) in msg.debug.toolCalls" :key="index" class="rag-debug__tool">
+                    <div class="rag-debug__tool-head">工具 #{{ index + 1 }}：{{ call.name }}</div>
+                    <div class="rag-debug__tool-line">入参：{{ call.arguments }}</div>
+                    <div class="rag-debug__tool-line">结果：{{ truncate(call.result) }}</div>
+                  </div>
                 </div>
                 <div v-if="msg.debug.hits.length === 0" class="rag-debug__empty">
-                  未检索到满足阈值的知识片段
+                  本次未使用知识库检索
                 </div>
                 <div v-for="(hit, index) in msg.debug.hits" :key="index" class="rag-debug__hit">
                   <div class="rag-debug__hit-head">
@@ -88,14 +95,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
 import { ChatDotRound, Delete, Promotion, Service } from '@element-plus/icons-vue'
-import { sendChatMessage, type RagDebugVO } from '@/api/ai'
+import { sendChatMessage, type AiDebugVO } from '@/api/ai'
 
 interface ChatMessage {
   id: number
   role: 'user' | 'assistant'
   content: string
   loading?: boolean
-  debug?: RagDebugVO | null
+  debug?: AiDebugVO | null
 }
 
 const WELCOME_TEXT = '你好，我是体育器材智能客服。你可以问我器材借用、归还、库存等问题，比如“篮球怎么借？”。'
@@ -144,6 +151,21 @@ function clearChat() {
 
 function formatSimilarity(score: number | null) {
   return score == null ? '—' : score.toFixed(4)
+}
+
+const INTENT_LABELS: Record<string, string> = {
+  KNOWLEDGE: '知识检索',
+  BUSINESS: '业务数据查询',
+  MIXED: '知识 + 业务',
+  CHAT: '直接对话',
+}
+
+function intentLabel(intent: string) {
+  return INTENT_LABELS[intent] ?? intent
+}
+
+function truncate(text: string, max = 300) {
+  return text.length > max ? `${text.slice(0, max)}…` : text
 }
 
 async function scrollToBottom() {
@@ -324,6 +346,29 @@ async function scrollToBottom() {
 
   &__empty {
     color: #909399;
+  }
+
+  &__tools {
+    margin-bottom: 8px;
+  }
+
+  &__tool {
+    margin-bottom: 6px;
+    padding: 6px 8px;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #ebeef5;
+  }
+
+  &__tool-head {
+    color: #409eff;
+    margin-bottom: 4px;
+  }
+
+  &__tool-line {
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
   }
 
   &__hit {

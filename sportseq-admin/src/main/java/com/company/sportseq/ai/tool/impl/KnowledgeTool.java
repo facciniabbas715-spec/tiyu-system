@@ -3,6 +3,7 @@ package com.company.sportseq.ai.tool.impl;
 import com.company.sportseq.ai.tool.AiTool;
 import com.company.sportseq.ai.tool.AiToolOutcome;
 import com.company.sportseq.ai.tool.AiToolPermission;
+import com.company.sportseq.ai.tool.AiToolTrace;
 import com.company.sportseq.knowledge.service.RagPromptBuilder;
 import com.company.sportseq.knowledge.service.RagService;
 import com.company.sportseq.knowledge.vo.RagHitVO;
@@ -42,6 +43,7 @@ public class KnowledgeTool implements AiTool {
             List<Hit> mapped = hits.stream()
                     .map(hit -> new Hit(hit.title(), hit.content(), hit.similarity()))
                     .toList();
+            AiToolTrace.recordKnowledgeHits(hits);
             return AiToolOutcome.success(mapped);
         } catch (Exception e) {
             log.warn("知识检索工具调用失败，query={}", query, e);
