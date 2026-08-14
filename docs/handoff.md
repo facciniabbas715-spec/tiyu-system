@@ -12,7 +12,7 @@
 | --- | --- |
 | 工作目录（开发） | `E:\codex——vibecoding works\体育器材管理系统\.worktrees\phase-01-scaffold`（git worktree，分支 develop） |
 | 主仓库 | `E:\codex——vibecoding works\体育器材管理系统`（main 分支，已含完整快照） |
-| 远程仓库 | `origin = https://github.com/facciniabbas715-spec/tiyu-system.git`（公开，`main` 与标签 `v1.0.0`、`v2.0.0` 已推送） |
+| 远程仓库 | `origin = https://github.com/facciniabbas715-spec/tiyu-system.git`（公开，`main` 与标签 `v1.0.0`、`v2.0.0`、`v3.0.0` 已推送） |
 | 本机代理 | 本仓库已配置 `http.https://github.com.proxy = http://127.0.0.1:7897`（Clash Verge），push/pull 直连不通时走代理 |
 | JDK | Temurin 21.0.12 LTS，用户级 `JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`；**每个构建/启动命令前设置 `$env:JAVA_HOME`**（mvnw 用 JAVA_HOME） |
 | Maven | 项目自带 mvnw（`.\mvnw.cmd`），无全局 Maven |
@@ -25,6 +25,7 @@
 
 - **2026-08-10 已做第一版存档**：`main` 已合并 develop 全部实现（311 个文件），打标签 `v1.0.0` 并推送到 GitHub 公开仓库 `facciniabbas715-spec/tiyu-system`。
 - **2026-08-14 Redis 业务缓存 v2.0.0**：develop `feat: integrate redis cache` 已合并回 `main`，打标签 `v2.0.0` 并推送 GitHub。
+- **2026-08-14 AI 智能客服 v3.0.0**：develop `feat: add spring ai chatbot` 与 Redis 缓存加固（`fix: complete dashboard summary cache invalidation`、`fix: harden cache key hashing and throttle redis failure logs`）已合并回 `main`，打标签 `v3.0.0` 并推送 GitHub。
 - `develop`（worktree）与 `main` 当前内容一致（develop 分支本身未推送远端，需要时再推）。
 - 约定：commit 编号与主计划对应；日常开发在 `develop` 提交，`main` 只接受 release 合并；后续大升级完成后合并回 `main` 并打新版本标签（如 `v1.1.0`）再推送。
 
