@@ -52,6 +52,11 @@ public class RagServiceImpl implements RagService {
     }
 
     @Override
+    public List<RagHitVO> retrieve(String question) {
+        return vectorStoreService.search(question);
+    }
+
+    @Override
     public RagResult answer(String question) {
         List<RagHitVO> hits = vectorStoreService.search(question);
         if (hits.isEmpty()) {
