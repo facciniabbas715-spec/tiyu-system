@@ -26,6 +26,7 @@
 - **2026-08-10 已做第一版存档**：`main` 已合并 develop 全部实现（311 个文件），打标签 `v1.0.0` 并推送到 GitHub 公开仓库 `facciniabbas715-spec/tiyu-system`。
 - **2026-08-14 Redis 业务缓存 v2.0.0**：develop `feat: integrate redis cache` 已合并回 `main`，打标签 `v2.0.0` 并推送 GitHub。
 - **2026-08-14 AI 智能客服 v3.0.0**：develop `feat: add spring ai chatbot` 与 Redis 缓存加固（`fix: complete dashboard summary cache invalidation`、`fix: harden cache key hashing and throttle redis failure logs`）已合并回 `main`，打标签 `v3.0.0` 并推送 GitHub。
+- **2026-08-14 RAG 知识库 v3.1.0**：develop `feat: implement rag knowledge base` 已合并回 `main`，打标签 `v3.1.0` 并推送 GitHub。
 - `develop`（worktree）与 `main` 当前内容一致（develop 分支本身未推送远端，需要时再推）。
 - 约定：commit 编号与主计划对应；日常开发在 `develop` 提交，`main` 只接受 release 合并；后续大升级完成后合并回 `main` 并打新版本标签（如 `v1.1.0`）再推送。
 
@@ -189,4 +190,4 @@ npm run build
 8. **内置知识**：`sportseq-admin/src/main/resources/knowledge/*.md` 共 11 篇（使用说明/借用/归还/损坏/维护/分类/篮球/足球/羽毛球/乒乓球/网球），内容与真实状态机一致；`POST /api/knowledge/documents/seed` 导入。
 9. **踩坑与处理**：Tika 3.x 引入 POI 5.x 与 EasyExcel POI 4.1.2/xmlbeans 冲突（CTWorkbook NoClassDefFoundError）→ 弃 Tika，docx 用 POI 4.1.2、pdf 用 spring-ai-pdf-document-reader；dev 库残留用户 `yze`（测试数据）已软删除（del_flag=1）以稳定 `SysPermissionTest`。
 10. **验证**：后端全量 **137/137** 通过；前端 type-check/build 通过；冒烟脚本新增知识库分页检查；新增 `scripts/rag-verify.ps1`（UTF-8 BOM，真实 seed+Embedding+检索+聊天端到端验证）。
-11. **待办（下个会话）**：按用户要求提交 `feat: implement rag knowledge base`；确认后合并回 main、打标签 v3.1.0 并推送 GitHub（代理 127.0.0.1:7897，需 Clash 运行）；生产上线前设 `RAG_VECTOR_STORE=redis` 并部署 Redis Stack。
+11. **发布状态**：已提交 `feat: implement rag knowledge base`，并合并回 main、打标签 v3.1.0、推送 GitHub。后续生产上线前设 `RAG_VECTOR_STORE=redis` 并部署 Redis Stack；如需把 develop 也推到远端可再补推。
