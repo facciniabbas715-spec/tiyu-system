@@ -36,7 +36,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * AI 智能客服集成测试：使用桩 ChatModel 验证接口契约、认证、参数校验与消息拼装。
  */
-@SpringBootTest(properties = "spring.ai.rag.enabled=false")
+@SpringBootTest(properties = {
+        "spring.ai.rag.enabled=false",
+        "spring.ai.rate-limit.enabled=false"
+})
 @AutoConfigureMockMvc
 class AiChatTest {
 
@@ -52,6 +55,16 @@ class AiChatTest {
 
     @MockitoBean
     private ChatModel chatModel;
+
+    @org.junit.jupiter.api.BeforeEach
+    void clearChatHistory() {
+        redisTemplate.delete("sportseq:ai:history:1");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void cleanupChatHistory() {
+        redisTemplate.delete("sportseq:ai:history:1");
+    }
 
     @Test
     void chat_shouldReturnAiContent() throws Exception {
@@ -85,6 +98,8 @@ class AiChatTest {
         assertEquals(MessageType.SYSTEM, messages.get(0).getMessageType());
         assertTrue(messages.get(0).getText().contains("体育器材智能客服"),
                 "系统提示词应告知模型客服身份");
+        assertTrue(messages.get(0).getText().contains("Markdown"),
+                "系统提示词应要求输出纯文本而非 Markdown");
         assertEquals("篮球怎么借？", messages.get(1).getText());
     }
 

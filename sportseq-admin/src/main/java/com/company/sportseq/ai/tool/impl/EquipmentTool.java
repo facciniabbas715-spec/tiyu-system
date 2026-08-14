@@ -12,7 +12,6 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -36,7 +35,7 @@ public class EquipmentTool implements AiTool {
             EquipmentVO vo = equipmentService.detail(equipmentId);
             return AiToolOutcome.success(new EquipmentDetail(vo.id(), vo.equipmentCode(),
                     vo.equipmentName(), vo.categoryName(), vo.brand(), vo.model(), vo.spec(),
-                    vo.unit(), vo.purchasePrice(), vo.safeStock(), vo.maxBorrowDays(),
+                    vo.unit(), vo.safeStock(), vo.maxBorrowDays(),
                     vo.status(), vo.description()));
         } catch (BizException e) {
             return AiToolOutcome.failure(e.getMessage());
@@ -74,7 +73,7 @@ public class EquipmentTool implements AiTool {
      */
     public record EquipmentDetail(Long id, String equipmentCode, String equipmentName,
                                   String categoryName, String brand, String model, String spec,
-                                  String unit, BigDecimal purchasePrice, Integer safeStock,
+                                  String unit, Integer safeStock,
                                   Integer maxBorrowDays, Integer status, String description) {
     }
 

@@ -3,6 +3,7 @@ package com.company.sportseq.ai.tool.impl;
 import com.company.sportseq.ai.tool.AiTool;
 import com.company.sportseq.ai.tool.AiToolOutcome;
 import com.company.sportseq.ai.tool.AiToolPermission;
+import com.company.sportseq.common.result.PageResult;
 import com.company.sportseq.service.StockService;
 import com.company.sportseq.vo.StockVO;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +12,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +30,8 @@ import java.util.stream.Collectors;
 @AiToolPermission("stock:list")
 public class InventoryTool implements AiTool {
 
+    private static final int PAGE_SIZE = 100;
+
     private final StockService stockService;
 
     @Tool(description = "查询指定器材名称的真实库存：返回各仓库的在库数量、锁定数量与可用数量汇总（可用=在库-锁定），数据来自业务数据库")
@@ -38,8 +42,16 @@ public class InventoryTool implements AiTool {
         }
         String keyword = equipmentName.trim();
         try {
-            List<StockVO> rows = stockService.page(1, 50, keyword, null, null, null, false)
-                    .records();
+            List<StockVO> rows = new ArrayList<>();
+            PageResult<StockVO> page = stockService.page(1, PAGE_SIZE, keyword, null, null, null, false);
+            rows.addAll(page.records());
+            while (rows.size() < page.total()) {
+                page = stockService.page(page.current() + 1, PAGE_SIZE, keyword, null, null, null, false);
+                if (page.records().isEmpty()) {
+                    break;
+                }
+                rows.addAll(page.records());
+            }
             if (rows.isEmpty()) {
                 return AiToolOutcome.failure("未查询到「" + keyword + "」的库存记录。");
             }

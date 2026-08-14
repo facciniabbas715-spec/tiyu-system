@@ -3,6 +3,7 @@ package com.company.sportseq.ai.tool.impl;
 import com.company.sportseq.ai.tool.AiTool;
 import com.company.sportseq.ai.tool.AiToolOutcome;
 import com.company.sportseq.ai.tool.AiToolPermission;
+import com.company.sportseq.common.result.PageResult;
 import com.company.sportseq.service.BorrowService;
 import com.company.sportseq.service.SysConfigService;
 import com.company.sportseq.vo.BorrowOrderVO;
@@ -12,6 +13,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -26,6 +28,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 @AiToolPermission
 public class BorrowTool implements AiTool {
+
+    private static final int PAGE_SIZE = 100;
 
     private static final Map<Integer, String> STATUS_TEXT = Map.ofEntries(
             Map.entry(0, "待审核"),
@@ -48,8 +52,17 @@ public class BorrowTool implements AiTool {
             return AiToolOutcome.failure("借用状态参数无效，可选值：0-6。");
         }
         try {
-            List<BorrowRecordSummary> records = borrowService.myPage(1, 50, status)
-                    .records().stream()
+            List<BorrowOrderVO> orders = new ArrayList<>();
+            PageResult<BorrowOrderVO> page = borrowService.myPage(1, PAGE_SIZE, status);
+            orders.addAll(page.records());
+            while (orders.size() < page.total()) {
+                page = borrowService.myPage(page.current() + 1, PAGE_SIZE, status);
+                if (page.records().isEmpty()) {
+                    break;
+                }
+                orders.addAll(page.records());
+            }
+            List<BorrowRecordSummary> records = orders.stream()
                     .map(this::toSummary)
                     .toList();
             return AiToolOutcome.success(records);
