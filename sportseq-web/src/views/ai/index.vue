@@ -242,7 +242,7 @@ async function scrollToBottom() {
 
   &__icon {
     font-size: 20px;
-    color: #409eff;
+    color: #2e5aa0;
   }
 
   &__title {
@@ -280,12 +280,12 @@ async function scrollToBottom() {
   flex-shrink: 0;
 
   &.avatar-ai {
-    background: #409eff;
+    background: #3f74c5;
     color: #fff;
   }
 
   &.avatar-user {
-    background: #67c23a;
+    background: #221f1c;
     color: #fff;
   }
 }
@@ -300,12 +300,13 @@ async function scrollToBottom() {
   word-break: break-word;
 
   &.bubble-ai {
-    background: #f4f4f5;
-    color: #303133;
+    background: #f5f5f5;
+    border: 1px solid #eeece7;
+    color: #221f1c;
   }
 
   &.bubble-user {
-    background: #409eff;
+    background: #3f74c5;
     color: #fff;
   }
 }
@@ -320,7 +321,7 @@ async function scrollToBottom() {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #909399;
+    background: #8c8a88;
     animation: typing-bounce 1s infinite ease-in-out;
 
     &:nth-child(2) {
@@ -336,9 +337,9 @@ async function scrollToBottom() {
 .rag-debug {
   margin-top: 8px;
   width: 100%;
-  border: 1px dashed #c0c4cc;
-  border-radius: 6px;
-  background: #fafafa;
+  border: 1px dashed #d8d4cd;
+  border-radius: 8px;
+  background: #faf9f7;
 
   :deep(.el-collapse-item__header) {
     height: 34px;
@@ -355,12 +356,12 @@ async function scrollToBottom() {
   :deep(.el-collapse-item__content) {
     padding: 0 10px 10px;
     font-size: 12px;
-    color: #606266;
+    color: #4a453f;
   }
 
   &__title {
     font-size: 12px;
-    color: #909399;
+    color: #8c8a88;
   }
 
   &__query {
@@ -369,11 +370,11 @@ async function scrollToBottom() {
 
   &__meta {
     margin-bottom: 8px;
-    color: #909399;
+    color: #8c8a88;
   }
 
   &__empty {
-    color: #909399;
+    color: #8c8a88;
   }
 
   &__tools {
@@ -384,12 +385,12 @@ async function scrollToBottom() {
     margin-bottom: 6px;
     padding: 6px 8px;
     background: #fff;
-    border-radius: 4px;
-    border: 1px solid #ebeef5;
+    border-radius: 8px;
+    border: 1px solid #ece9e4;
   }
 
   &__tool-head {
-    color: #409eff;
+    color: #2e5aa0;
     margin-bottom: 4px;
   }
 
@@ -403,12 +404,12 @@ async function scrollToBottom() {
     margin-bottom: 8px;
     padding: 6px 8px;
     background: #fff;
-    border-radius: 4px;
-    border: 1px solid #ebeef5;
+    border-radius: 8px;
+    border: 1px solid #ece9e4;
   }
 
   &__hit-head {
-    color: #409eff;
+    color: #2e5aa0;
     margin-bottom: 4px;
   }
 
@@ -444,7 +445,7 @@ async function scrollToBottom() {
   }
 
   &__tip {
-    color: #909399;
+    color: #8c8a88;
     font-size: 12px;
   }
 }

@@ -13,4 +13,21 @@
   text-align: center;
   padding-top: 120px;
 }
+
+h1 {
+  font-size: 72px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  background: linear-gradient(90deg, #518bdb, #36bab8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+p {
+  margin: 14px 0 28px;
+  font-size: 15px;
+  color: #797267;
+}
 </style>

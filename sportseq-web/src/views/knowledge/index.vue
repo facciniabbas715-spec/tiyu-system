@@ -26,8 +26,8 @@
     </div>
 
     <el-table v-loading="loading" :data="records" border>
-      <el-table-column prop="title" label="文档标题" min-width="180" show-overflow-tooltip />
-      <el-table-column prop="fileName" label="文件名" min-width="180" show-overflow-tooltip />
+      <el-table-column prop="title" label="文档标题" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="fileName" label="文件名" min-width="140" show-overflow-tooltip />
       <el-table-column prop="fileType" label="类型" width="80" />
       <el-table-column label="大小" width="100">
         <template #default="{ row }">{{ formatSize(row.fileSize) }}</template>
@@ -39,7 +39,7 @@
       </el-table-column>
       <el-table-column prop="chunkCount" label="分块数" width="80" />
       <el-table-column prop="createTime" label="创建时间" width="170" />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row.id)">查看</el-button>
           <el-button
@@ -309,18 +309,18 @@ onMounted(loadData)
 
 .chunk-item {
   margin-bottom: 10px;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
+  border: 1px solid #ece9e4;
+  border-radius: 8px;
   padding: 10px 12px;
 
   &__head {
     font-weight: 600;
-    color: #409eff;
+    color: #2e5aa0;
     margin-bottom: 6px;
   }
 
   &__content {
-    color: #606266;
+    color: #4a453f;
     font-size: 13px;
     line-height: 1.7;
     white-space: pre-wrap;

@@ -1,7 +1,144 @@
+// Micro light theme —— 依据 DESIGN (1).md 的暖白纸感风格
+// 设计令牌 + Element Plus 全局变量映射 + 组件细节打磨
+
+:root {
+  /* 品牌色板 */
+  --micro-ink: #221f1c;
+  --micro-ink-soft: #4a453f;
+  --micro-paper: #f5f5f5;
+  --micro-card: #ffffff;
+  --micro-stone: #797267;
+  --micro-pebble: #8c8a88;
+  --micro-hairline: #e6e3dd;
+  --micro-hairline-soft: #eeece7;
+  --micro-azure: #518bdb;
+  --micro-azure-deep: #3f74c5;
+  --micro-azure-ink: #2e5aa0;
+  --micro-teal: #36bab8;
+  --micro-teal-ink: #0f7a78;
+  --micro-mint: #cbfbf1;
+  --micro-peach: #f8ebd8;
+  --micro-lavender: #ede9fe;
+  --micro-teal-mist: #cff2ef;
+  --micro-coral: #ed6d68;
+  --micro-coral-ink: #c64a45;
+  --micro-amber: #e5a057;
+  --micro-amber-ink: #a66a24;
+  --micro-orchid: #bf89cd;
+  --micro-orchid-ink: #8a5ca8;
+  --micro-green-ink: #3a6b2a;
+
+  /* 字体 */
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+
+  /* 圆角 */
+  --radius-btn: 8px;
+  --radius-card: 14px;
+  --radius-card-lg: 18px;
+
+  /* 阴影（hairline + subtle 两层） */
+  --shadow-subtle: 0 1px 3px rgba(34, 31, 28, 0.08), 0 1px 2px -1px rgba(34, 31, 28, 0.06);
+  --shadow-card: 0 1px 3px rgba(34, 31, 28, 0.07), 0 2px 6px -2px rgba(34, 31, 28, 0.06);
+  --shadow-md: 0 10px 15px -3px rgba(34, 31, 28, 0.1), 0 4px 6px -4px rgba(34, 31, 28, 0.08);
+  --shadow-lg: 0 20px 25px -5px rgba(34, 31, 28, 0.1), 0 8px 10px -6px rgba(34, 31, 28, 0.08);
+
+  /* ---------- Element Plus 变量映射 ---------- */
+  --el-font-family: var(--font-ui);
+
+  --el-color-primary: #3f74c5;
+  --el-color-primary-light-3: #799ed6;
+  --el-color-primary-light-5: #9fbae2;
+  --el-color-primary-light-7: #c5d5ee;
+  --el-color-primary-light-8: #d9e3f3;
+  --el-color-primary-light-9: #ecf1f9;
+  --el-color-primary-dark-2: #325d9e;
+
+  --el-color-success: #3a6b2a;
+  --el-color-success-light-3: #75976a;
+  --el-color-success-light-5: #9db595;
+  --el-color-success-light-7: #c4d3bf;
+  --el-color-success-light-8: #d8e1d4;
+  --el-color-success-light-9: #ebf0ea;
+  --el-color-success-dark-2: #2e5622;
+
+  --el-color-warning: #a66a24;
+  --el-color-warning-light-3: #c19766;
+  --el-color-warning-light-5: #d3b592;
+  --el-color-warning-light-7: #e4d2bd;
+  --el-color-warning-light-8: #ede1d3;
+  --el-color-warning-light-9: #f6f0e9;
+  --el-color-warning-dark-2: #85551d;
+
+  --el-color-danger: #c64a45;
+  --el-color-danger-light-3: #d7807d;
+  --el-color-danger-light-5: #e3a5a2;
+  --el-color-danger-light-7: #eec9c7;
+  --el-color-danger-light-8: #f4dbda;
+  --el-color-danger-light-9: #f9edec;
+  --el-color-danger-dark-2: #9e3b37;
+
+  --el-color-error: #c64a45;
+  --el-color-error-light-3: #d7807d;
+  --el-color-error-light-5: #e3a5a2;
+  --el-color-error-light-7: #eec9c7;
+  --el-color-error-light-8: #f4dbda;
+  --el-color-error-light-9: #f9edec;
+  --el-color-error-dark-2: #9e3b37;
+
+  --el-color-info: #797267;
+  --el-color-info-light-3: #a19c95;
+  --el-color-info-light-5: #bcb9b3;
+  --el-color-info-light-7: #d7d5d1;
+  --el-color-info-light-8: #e4e3e1;
+  --el-color-info-light-9: #f2f1f0;
+  --el-color-info-dark-2: #615b52;
+
+  --el-text-color-primary: #221f1c;
+  --el-text-color-regular: #4a453f;
+  --el-text-color-secondary: #797267;
+  --el-text-color-placeholder: #8c8a88;
+  --el-text-color-disabled: #b9b5ad;
+
+  --el-border-color: #dcd9d2;
+  --el-border-color-light: #e6e3dd;
+  --el-border-color-lighter: #ece9e4;
+  --el-border-color-extra-light: #f2f0ec;
+  --el-border-color-dark: #c6c2ba;
+  --el-border-color-darker: #8c8a88;
+
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #f5f5f5;
+  --el-bg-color-overlay: #ffffff;
+  --el-fill-color: #f2f0ec;
+  --el-fill-color-light: #f6f5f2;
+  --el-fill-color-lighter: #faf9f7;
+  --el-fill-color-extra-light: #fcfbf9;
+  --el-fill-color-dark: #ece9e4;
+  --el-fill-color-darker: #e5e1db;
+  --el-fill-color-blank: #ffffff;
+
+  --el-border-radius-base: 8px;
+  --el-border-radius-small: 6px;
+
+  --el-box-shadow: var(--shadow-card);
+  --el-box-shadow-light: var(--shadow-subtle);
+  --el-box-shadow-lighter: 0 1px 2px rgba(34, 31, 28, 0.06);
+  --el-box-shadow-dark: var(--shadow-md);
+
+  --el-header-height: 56px;
+  --el-main-padding: 16px;
+  --el-mask-color: rgba(34, 31, 28, 0.45);
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
 }
 
 html,
@@ -11,7 +148,272 @@ body,
 }
 
 body {
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-family: var(--font-ui);
   font-size: 14px;
-  color: #303133;
+  line-height: 1.5;
+  color: var(--micro-ink);
+  background: var(--micro-paper);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: rgba(81, 139, 219, 0.22);
+}
+
+/* ---------- 滚动条 ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #d8d4cd;
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #c3beb6;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---------- 焦点可见性（键盘导航） ---------- */
+:where(a, button, input, textarea, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--micro-azure);
+  outline-offset: 2px;
+}
+
+/* ---------- 卡片 ---------- */
+.el-card {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--micro-hairline);
+  box-shadow: var(--shadow-subtle) !important;
+  transition: box-shadow 0.18s ease;
+}
+
+.el-card__header {
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--micro-ink);
+  border-bottom: 1px solid var(--micro-hairline-soft);
+}
+
+.el-card__body {
+  padding: 18px;
+}
+
+/* ---------- 按钮 ---------- */
+.el-button {
+  font-weight: 500;
+  border-radius: var(--radius-btn);
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.el-button--primary {
+  --el-button-hover-bg-color: var(--el-color-primary-dark-2);
+  --el-button-hover-border-color: var(--el-color-primary-dark-2);
+  --el-button-active-bg-color: #274a7e;
+  --el-button-active-border-color: #274a7e;
+}
+
+.el-button--success {
+  --el-button-hover-bg-color: var(--el-color-success-dark-2);
+  --el-button-hover-border-color: var(--el-color-success-dark-2);
+}
+
+.el-button--warning {
+  --el-button-hover-bg-color: var(--el-color-warning-dark-2);
+  --el-button-hover-border-color: var(--el-color-warning-dark-2);
+}
+
+.el-button--danger {
+  --el-button-hover-bg-color: var(--el-color-danger-dark-2);
+  --el-button-hover-border-color: var(--el-color-danger-dark-2);
+}
+
+.el-button:not(.el-button--primary, .el-button--success, .el-button--warning,
+    .el-button--danger, .el-button--info, .is-text, .is-link):hover {
+  background-color: var(--micro-paper);
+  border-color: var(--el-border-color);
+  color: var(--micro-ink);
+}
+
+/* ---------- 输入框 ---------- */
+.el-input__wrapper,
+.el-textarea__inner {
+  border-radius: var(--radius-btn);
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.el-input__wrapper {
+  box-shadow: 0 0 0 1px var(--el-border-color) inset;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--el-border-color-dark) inset;
+}
+
+.el-input__wrapper.is-focus,
+.el-input__wrapper.is-focus:hover {
+  box-shadow: 0 0 0 1px var(--micro-azure-deep) inset, 0 0 0 3px rgba(81, 139, 219, 0.18);
+}
+
+.el-textarea__inner:focus {
+  border-color: var(--micro-azure-deep);
+  box-shadow: 0 0 0 3px rgba(81, 139, 219, 0.15);
+}
+
+.el-select__wrapper {
+  border-radius: var(--radius-btn);
+}
+
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--micro-azure-deep) inset, 0 0 0 3px rgba(81, 139, 219, 0.18) !important;
+}
+
+/* ---------- 表格 ---------- */
+.el-table {
+  --el-table-border-color: var(--micro-hairline-soft);
+  --el-table-header-bg-color: #f7f6f3;
+  --el-table-header-text-color: var(--micro-ink-soft);
+  --el-table-text-color: var(--micro-ink-soft);
+  --el-table-row-hover-bg-color: #faf9f7;
+  --el-table-current-row-bg-color: var(--el-color-primary-light-9);
+  background: transparent;
+}
+
+.el-table th.el-table__cell {
+  font-weight: 600;
+}
+
+.el-table .el-table__cell {
+  padding: 10px 0;
+}
+
+.el-table__empty-block {
+  min-height: 140px;
+}
+
+/* ---------- 标签（药丸形） ---------- */
+.el-tag {
+  border: none;
+  border-radius: 999px;
+  padding: 0 10px;
+  font-weight: 500;
+}
+
+/* ---------- 弹窗 ---------- */
+.el-dialog {
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+}
+
+.el-dialog__header {
+  padding: 18px 20px 14px;
+  margin-right: 0;
+  border-bottom: 1px solid var(--micro-hairline-soft);
+}
+
+.el-dialog__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--micro-ink);
+}
+
+.el-dialog__body {
+  padding: 20px;
+}
+
+.el-dialog__footer {
+  padding: 0 20px 18px;
+}
+
+.el-message-box {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--micro-hairline);
+  box-shadow: var(--shadow-lg);
+}
+
+.el-message {
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--micro-hairline);
+  box-shadow: var(--shadow-md);
+}
+
+.el-notification {
+  border-radius: var(--radius-card);
+  border: 1px solid var(--micro-hairline);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ---------- 浮层 / 下拉 ---------- */
+.el-popper.is-light {
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--micro-hairline);
+  box-shadow: var(--shadow-md);
+}
+
+.el-dropdown-menu__item {
+  border-radius: 6px;
+  margin: 2px 4px;
+  padding: 7px 12px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.el-dropdown-menu__item:not(.is-disabled):focus,
+.el-dropdown-menu__item:not(.is-disabled):hover {
+  background-color: var(--micro-paper);
+  color: var(--micro-ink);
+}
+
+/* ---------- 面包屑 ---------- */
+.el-breadcrumb__inner,
+.el-breadcrumb__inner a {
+  color: var(--micro-stone);
+  font-weight: 400;
+}
+
+.el-breadcrumb__item:last-child .el-breadcrumb__inner {
+  color: var(--micro-ink);
+  font-weight: 600;
+}
+
+/* ---------- 分页 ---------- */
+.el-pagination {
+  --el-pagination-button-color: var(--micro-stone);
+}
+
+.el-pagination.is-background .el-pager li.is-active {
+  background-color: var(--micro-azure-deep);
+}
+
+/* ---------- 步骤条 / 开关等交互态保持品牌色 ---------- */
+.el-step__head.is-process {
+  color: var(--micro-azure-deep);
+  border-color: var(--micro-azure-deep);
+}
+
+.el-switch.is-checked .el-switch__core {
+  background-color: var(--micro-azure-deep);
+  border-color: var(--micro-azure-deep);
+}
+
+/* ---------- 动效：减少动态偏好 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -8,6 +8,8 @@
 
 2026-08-14 完成「AI 客服最终升级（RAG + 业务数据 + Tool Calling，v3.2.0）」：AI 能区分知识类与业务数据类问题，知识走 RAG、业务走受控工具层查真实数据，详见第 16 节。
 
+2026-08-14 完成「前端 Micro 主题 UI 优化」：按仓库根目录 `DESIGN (1).md` 将前端切换为暖白纸感浅色主题（不改动任何业务逻辑/接口/路由/权限），详见第 17 节。
+
 ## 2. 环境基线（重要）
 
 | 项 | 值 |
@@ -208,3 +210,12 @@ npm run build
 9. **已知口径**：库存/器材工具受 `stock:list` / `equipment:list` 权限约束，无权限角色会得到「无权限」答复而非数据；`rag-verify.ps1` 在新流程下仍然有效（工具模式下知识库外问题同样返回固定文案）。
 
 10. **P2/P3 审查整改（2026-08-14）**：新增用户级提问限流（`spring.ai.rate-limit.*`，Redis 分钟桶，超限 3105）；多轮对话记忆（`spring.ai.chat.history.*`，Redis 按用户隔离 + TTL，`GET/DELETE /api/ai/history`，前端刷新恢复、清空对话同步清理）；工具循环硬上限（`BoundedToolCallAdvisor`，`spring.ai.tools.max-tool-call-iterations` 默认 8，超限 3106——Spring AI 1.1.8 原生循环无上限）；上游 429/超时区分错误码 3103/3104；库存/借阅工具跨页全量聚合（每页 100）；`getEquipmentDetail` 不再向模型透出采购价；提示词禁止 Markdown + 前端纯文本清理；登录/守卫/首页统一落地 `/statistics/dashboard`（旧 `/dashboard` 保留为跳转别名）。发布状态：已合并 main、打标签 v3.2.1 并推送 GitHub。
+
+## 17. 前端 Micro 主题 UI 优化（2026-08-14，develop 未合并）
+
+1. **目标**：依据仓库根目录 `DESIGN (1).md`（Micro — Style Reference）优化前端视觉，**不改动任何业务功能**（无接口/路由/权限/字段变化）。
+2. **主题落地**：`src/styles/index.scss` 集中定义 Micro 令牌并覆盖 Element Plus CSS 变量（暖白画布、墨黑文字、蔚蓝主色、8/14/18px 圆角、发丝线边框、双层柔和阴影）；成功/警告/危险语义色加深以通过 4.5:1 文字对比度。
+3. **布局**：侧栏深色→暖白（渐变 logo、白色胶囊选中态），顶栏→白底发丝线 + 用户胶囊；登录页→全屏 Azure→Teal 渐变开场卡片；工作台统计卡→粉彩底图标 + 墨黑数字，图表统一品牌色并补充「暂无数据」空态；统计报表/AI 客服/知识库/库存流水/404/favicon 同步对齐。
+4. **响应性**：知识库、借用单表格列宽微调，1366px 宽度不横向滚动（1280px 下固定操作列仍可见）。
+5. **验证**：`npm run type-check`、`npm run build` 通过；`scripts/smoke-test.ps1` 12 项全通过；Playwright 走查登录/工作台/器材/统计/AI/知识库/借用/404 共 8 页，控制台 0 error，截图存 `output/playwright/micro-ui/*.png`（gitignore）。
+6. **说明**：主题设计文档见 `docs/design/ui-micro-theme.md`；`DESIGN (1).md` 位于主仓库根目录（未跟踪，未纳入提交）。
