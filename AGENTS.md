@@ -14,9 +14,9 @@
 
 ## 工作区与分支约定
 
-- 根目录（main 分支）：release / 存档，现为 v2.0.0。
-- `.worktrees\phase-01-scaffold`（develop 分支）：日常开发。
-- 日常提交到 develop；main 只接受 release 合并；大升级完成后合并回 main、打新标签（下一个为 v3.0.0）并推送 GitHub。
+- 根目录（main 分支）：release / 存档，现为 v3.0.0。
+- 本 worktree（develop 分支）：日常开发。
+- 日常提交到 develop；main 只接受 release 合并；大升级完成后合并回 main、打新标签（下一个为 v3.1.0）并推送 GitHub。
 - 远端：`origin = https://github.com/facciniabbas715-spec/tiyu-system.git`（公开）。
 - 本机网络：github.com 443 直连可能不通，本仓库已配置 `http.https://github.com.proxy = http://127.0.0.1:7897`；push/pull 失败先确认 Clash Verge 代理在运行。
 

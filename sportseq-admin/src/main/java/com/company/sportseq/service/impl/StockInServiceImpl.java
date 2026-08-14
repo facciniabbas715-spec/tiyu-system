@@ -115,6 +115,7 @@ public class StockInServiceImpl implements StockInService {
             item.setRemark(itemDto.getRemark());
             itemMapper.insert(item);
         }
+        cacheService.evictAfterCommit(this::evictDashboardSummary);
     }
 
     @Override
@@ -136,6 +137,9 @@ public class StockInServiceImpl implements StockInService {
         update.setAuditTime(LocalDateTime.now());
         update.setAuditRemark(dto.getRemark());
         orderMapper.updateById(update);
+        if (!Boolean.TRUE.equals(dto.getPass())) {
+            cacheService.evictAfterCommit(this::evictDashboardSummary);
+        }
     }
 
     @Override
@@ -190,6 +194,7 @@ public class StockInServiceImpl implements StockInService {
             throw new BizException(ErrorCode.ORDER_STATUS_ERROR, "当前状态不允许作废");
         }
         updateStatus(order, STATUS_CANCELED, null);
+        cacheService.evictAfterCommit(this::evictDashboardSummary);
     }
 
     @Override
@@ -198,6 +203,7 @@ public class StockInServiceImpl implements StockInService {
         checkStatus(order, STATUS_DRAFT, "仅草稿状态可删除");
         itemMapper.delete(Wrappers.<StockInItem>lambdaQuery().eq(StockInItem::getOrderId, id));
         orderMapper.deleteById(id);
+        cacheService.evictAfterCommit(this::evictDashboardSummary);
     }
 
     private StockInOrder getOrder(Long id) {
@@ -210,6 +216,10 @@ public class StockInServiceImpl implements StockInService {
 
     private void evictStockCaches() {
         cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
+    }
+
+    private void evictDashboardSummary() {
         cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 

@@ -12,7 +12,7 @@
 | --- | --- |
 | 工作目录（开发） | `E:\codex——vibecoding works\体育器材管理系统\.worktrees\phase-01-scaffold`（git worktree，分支 develop） |
 | 主仓库 | `E:\codex——vibecoding works\体育器材管理系统`（main 分支，已含完整快照） |
-| 远程仓库 | `origin = https://github.com/facciniabbas715-spec/tiyu-system.git`（公开，`main` 与标签 `v1.0.0` 已推送） |
+| 远程仓库 | `origin = https://github.com/facciniabbas715-spec/tiyu-system.git`（公开，`main` 与标签 `v1.0.0`、`v2.0.0`、`v3.0.0` 已推送） |
 | 本机代理 | 本仓库已配置 `http.https://github.com.proxy = http://127.0.0.1:7897`（Clash Verge），push/pull 直连不通时走代理 |
 | JDK | Temurin 21.0.12 LTS，用户级 `JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.12.8-hotspot`；**每个构建/启动命令前设置 `$env:JAVA_HOME`**（mvnw 用 JAVA_HOME） |
 | Maven | 项目自带 mvnw（`.\mvnw.cmd`），无全局 Maven |
@@ -24,6 +24,8 @@
 ## 3. Git 状态
 
 - **2026-08-10 已做第一版存档**：`main` 已合并 develop 全部实现（311 个文件），打标签 `v1.0.0` 并推送到 GitHub 公开仓库 `facciniabbas715-spec/tiyu-system`。
+- **2026-08-14 Redis 业务缓存 v2.0.0**：develop `feat: integrate redis cache` 已合并回 `main`，打标签 `v2.0.0` 并推送 GitHub。
+- **2026-08-14 AI 智能客服 v3.0.0**：develop `feat: add spring ai chatbot` 与 Redis 缓存加固（`fix: complete dashboard summary cache invalidation`、`fix: harden cache key hashing and throttle redis failure logs`）已合并回 `main`，打标签 `v3.0.0` 并推送 GitHub。
 - `develop`（worktree）与 `main` 当前内容一致（develop 分支本身未推送远端，需要时再推）。
 - 约定：commit 编号与主计划对应；日常开发在 `develop` 提交，`main` 只接受 release 合并；后续大升级完成后合并回 `main` 并打新版本标签（如 `v1.1.0`）再推送。
 
@@ -164,3 +166,12 @@ npm run build
 - 配置：`application-dev.yml` 新增 `spring.data.redis`（`REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`/`REDIS_DATABASE` 可覆盖）；新增根目录 `docker-compose.yml`（仅 `redis:7.4-alpine`，本地开发依赖，非部署配置）。
 - 测试：新增 `BusinessCacheTest` 6 例（命中回填、统一 Key、写后失效）；`StatisticTest.seed` 前置清汇总/热门缓存以保证 JDBC 直插断言；后端全量 73/73 通过。
 - 环境备注：dev 库残留的历史测试数据（分类 AB、器材 AB-2026-000001、用户 yze）已清理；与本次缓存改动无关。
+
+## 14. AI 智能客服（第一阶段，2026-08-14）
+
+1. **依赖**：引入 Spring AI 1.1.8（`spring-ai-bom` + `spring-ai-starter-model-openai`，官方对应 Spring Boot 3.5.x 版本线）；模型走 OpenAI 兼容协议，标准接口 `ChatModel` / `ChatClient`。
+2. **后端模块**：独立包 `com.company.sportseq.ai`（controller/service/config/dto/vo/exception），`POST /api/ai/chat` 权限 `ai:chat`，请求 `{message}`，响应 `Result<AiChatVO{content}>`。不修改任何器材业务代码。
+3. **配置**：`application.yml` 的 `spring.ai.openai.*`；`api-key` 只从环境变量 `AI_API_KEY` 读取（`AI_BASE_URL`/`AI_MODEL` 可选）。为让无 Key 时应用/测试仍能启动，`spring.ai.model.*=none` 关闭 starter 自动装配，由 `AiConfig` 条件构建 Bean；未配置时对话返回 3101 友好提示。
+4. **菜单**：Flyway V4 新增 `sys_menu` id=800（`/ai` → `ai/index`，perms `ai:chat`），并给 role_id=1 授权；其他角色在「角色管理」按需分配。
+5. **前端**：`src/api/ai.ts` + `src/views/ai/index.vue`（对话区/左右气泡/输入框/发送/Loading/清空），请求超时 60s。
+6. **测试**：新增 `AiChatTest`（桩模型验证接口/认证/参数/系统提示词）与 `AiChatNotConfiguredTest`（无 Key 友好降级）；全量后端 78/78、前端 type-check/build、冒烟 11 项、Playwright 实测「AI客服」页面均通过。

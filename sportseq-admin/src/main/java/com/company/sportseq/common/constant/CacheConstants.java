@@ -100,11 +100,20 @@ public final class CacheConstants {
         return USAGE_TOP_PREFIX + rangeHash;
     }
 
-    /** 参数串 MD5：用于带参数字段的分页缓存键，null 按空串处理 */
+    /**
+     * 参数串 MD5：用于带参数字段的分页缓存键。
+     *
+     * <p>每个字段采用「字符数:内容」定长前缀拼接后再做 MD5，避免字段内容含分隔符时
+     * 产生边界错位碰撞；字段为 null 按空串处理，整个参数数组为 null 按空输入处理。</p>
+     */
     public static String hash(Object... values) {
+        if (values == null || values.length == 0) {
+            return DigestUtil.md5Hex("");
+        }
         StringBuilder builder = new StringBuilder();
         for (Object value : values) {
-            builder.append(value == null ? "" : value.toString()).append('|');
+            String text = value == null ? "" : value.toString();
+            builder.append(text.length()).append(':').append(text);
         }
         return DigestUtil.md5Hex(builder.toString());
     }
