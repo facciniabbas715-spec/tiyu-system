@@ -5,7 +5,7 @@
 ## 技术栈
 
 - 前端：Vue 3 + Vite + TypeScript + Element Plus + Pinia + Vue Router + Axios + ECharts
-- 后端：Spring Boot 3.5 + Spring Security（JWT + Redis）+ MyBatis-Plus + MySQL 8.0 + Flyway + EasyExcel + Spring AI（AI 智能客服 + RAG 知识库）
+- 后端：Spring Boot 3.5 + Spring Security（JWT + Redis）+ MyBatis-Plus + MySQL 8.0 + Flyway + EasyExcel + Spring AI（AI 智能客服：RAG + 业务数据 + 工具调用）
 
 ## 目录结构
 
@@ -108,9 +108,23 @@ D:\Redis\redis-cli.exe GET "sportseq:equipment:detail:1"
 
 连接参数可用环境变量覆盖：`REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`REDIS_DATABASE`。
 
-## AI 智能客服（已接入 RAG 知识库）
+## AI 智能客服（RAG + 业务数据 + 工具调用）
 
-侧边栏进入「AI客服」即可对话。回答基于系统知识库检索结果：知识库没有相关资料时明确回复「知识库中暂无相关信息。」，不让模型自行编造规则。开发环境（dev profile）会在回答下方展示「RAG 检索详情」（query、检索片段、相似度、最终回答），生产环境不返回这些内部信息。
+侧边栏进入「AI客服」即可对话。AI 会自动区分两类问题：知识类（怎么保养、怎么借、规则流程）走 RAG 知识库检索；业务数据类（现在有多少库存、我借了什么、什么时候归还）通过受控工具查询真实业务数据库，再由模型组织成自然语言。
+
+### 业务工具与安全边界
+
+| 工具 | 用途 | 所需权限 |
+| --- | --- | --- |
+| `searchKnowledge` | 检索系统知识库（保养/流程/规则） | 登录即可 |
+| `getEquipmentStock` | 查询器材真实库存（可用=在库-锁定） | `stock:list` |
+| `getUserBorrowRecords` | 查询当前用户本人的借用记录 | 登录即可 |
+| `getBorrowRule` | 借用规则参数（天数/违约金/续借上限） | 登录即可 |
+| `getEquipmentDetail` / `searchEquipment` | 器材档案详情 / 按名称搜索 | `equipment:list` |
+
+AI 不能执行 SQL、不能修改数据库：所有工具只能调用业务 Service 的只读方法；每个工具执行前按上表做权限校验；「我的借阅」的用户身份由服务端绑定，模型无法查他人数据；工具无数据或失败时模型必须如实转告，不允许编造库存或借用记录。
+
+开发环境（dev profile）会在回答下方展示「AI 处理详情」（意图、工具调用与入参/结果、知识检索片段），生产环境恒不返回这些内部信息。
 
 ### 知识库管理
 
@@ -134,6 +148,9 @@ $env:AI_EMBEDDING_API_KEY="sk-xxxx"                                   # 默认�
 $env:AI_EMBEDDING_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
 $env:AI_EMBEDDING_MODEL="text-embedding-v3"                            # OpenAI 可用 text-embedding-3-small
 $env:AI_EMBEDDING_DIMENSIONS="1024"                                    # 需与模型实际维度一致（DashScope v3=1024）
+
+# AI 工具调用总开关（可选，默认开启）
+$env:AI_TOOLS_ENABLED="true"          # 关闭后客服退回 RAG / 纯对话路径
 ```
 
 设置环境变量后重启后端，使用 `admin / admin123` 登录；先在「知识库」页导入内置知识库，再到「AI客服」页提问即可。
@@ -152,11 +169,16 @@ docker compose up -d redis   # 已配置 redis/redis-stack-server:7.4.0-v0
 
 本机没有 Docker 时，dev profile 自动切换为内存向量库兜底（`spring.ai.rag.vector.type=simple`，JSON 持久化到 `data/knowledge/vector-store.json`），接口与 Redis 实现完全一致，适合开发验证；生产/部署建议使用 Redis（环境变量 `RAG_VECTOR_STORE=redis`）。
 
-### 验证 RAG 确实生效
+### 验证 RAG 与业务工具确实生效
 
 ```powershell
-# 后端启动后（Redis 6379 已运行）：
+# 知识链路：后端启动后（Redis 6379 已运行）：
 .\scripts\rag-verify.ps1
+
+# 知识 + 业务链路（需配置 AI_API_KEY 并重启后端）：
+.\scripts\ai-tools-verify.ps1
 ```
 
-脚本会真实走完：导入内置知识库 → 提问「篮球应该怎么保养？」（校验命中知识库并接地回答）→ 提问知识库外问题（校验固定回复「知识库中暂无相关信息。」，证明没有让模型胡编）。
+`rag-verify.ps1` 验证：导入内置知识库 → 提问「篮球应该怎么保养？」（校验命中知识库并接地回答）→ 提问知识库外问题（校验固定回复，证明没有胡编）。
+
+`ai-tools-verify.ps1` 验证：知识题走 `searchKnowledge`（RAG 命中）→ 库存题走 `getEquipmentStock`（返回真实库存结构）→ 借阅题走 `getUserBorrowRecords`（当前用户真实记录），并断言工具确实被调用且返回真实业务数据。
