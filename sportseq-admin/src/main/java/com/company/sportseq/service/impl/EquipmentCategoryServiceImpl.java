@@ -2,6 +2,8 @@ package com.company.sportseq.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.company.sportseq.common.cache.CacheService;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.dto.EquipmentCategoryDTO;
@@ -11,6 +13,7 @@ import com.company.sportseq.mapper.EquipmentCategoryMapper;
 import com.company.sportseq.mapper.EquipmentMapper;
 import com.company.sportseq.service.EquipmentCategoryService;
 import com.company.sportseq.vo.EquipmentCategoryVO;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -25,12 +28,19 @@ public class EquipmentCategoryServiceImpl implements EquipmentCategoryService {
 
     private final EquipmentCategoryMapper categoryMapper;
     private final EquipmentMapper equipmentMapper;
+    private final CacheService cacheService;
 
     @Override
     public List<EquipmentCategoryVO> tree(String categoryName) {
-        List<EquipmentCategory> categories = categoryMapper.selectList(
-                Wrappers.<EquipmentCategory>lambdaQuery()
-                        .like(StrUtil.isNotBlank(categoryName), EquipmentCategory::getCategoryName, categoryName)
+        // 无过滤条件时缓存全量列表（分类树/下拉高频读取），带过滤条件仍走 SQL 保持 LIKE 语义
+        List<EquipmentCategory> categories = StrUtil.isBlank(categoryName)
+                ? cacheService.getOrLoad(CacheConstants.CATEGORY_LIST_KEY,
+                        new TypeReference<>() {
+                        }, CacheConstants.CATEGORY_TTL,
+                        () -> categoryMapper.selectList(Wrappers.<EquipmentCategory>lambdaQuery()
+                                .orderByAsc(EquipmentCategory::getSortOrder)))
+                : categoryMapper.selectList(Wrappers.<EquipmentCategory>lambdaQuery()
+                        .like(EquipmentCategory::getCategoryName, categoryName)
                         .orderByAsc(EquipmentCategory::getSortOrder));
         Map<Long, EquipmentCategoryVO> voMap = categories.stream()
                 .collect(Collectors.toMap(EquipmentCategory::getId, this::toVo));
@@ -60,6 +70,7 @@ public class EquipmentCategoryServiceImpl implements EquipmentCategoryService {
         category.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         category.setRemark(dto.getRemark());
         categoryMapper.insert(category);
+        cacheService.evict(CacheConstants.CATEGORY_LIST_KEY);
     }
 
     @Override
@@ -79,6 +90,7 @@ public class EquipmentCategoryServiceImpl implements EquipmentCategoryService {
         category.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         category.setRemark(dto.getRemark());
         categoryMapper.updateById(category);
+        evictCategoryRelated(dto.getId());
     }
 
     @Override
@@ -94,6 +106,14 @@ public class EquipmentCategoryServiceImpl implements EquipmentCategoryService {
             throw new BizException(ErrorCode.EQUIPMENT_IN_USE);
         }
         categoryMapper.deleteById(id);
+        evictCategoryRelated(id);
+    }
+
+    /** 分类变化会影响分类缓存、器材列表/库存分页中展示的分类名称 */
+    private void evictCategoryRelated(Long categoryId) {
+        cacheService.evict(CacheConstants.CATEGORY_LIST_KEY, CacheConstants.categoryKey(categoryId));
+        cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
     }
 
     private void checkCodeUnique(String categoryCode, Long excludeId) {

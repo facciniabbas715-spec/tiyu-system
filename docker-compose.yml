@@ -1,0 +1,21 @@
+# 仅用于本地开发环境的 Redis 7 依赖，不包含任何应用服务（非部署配置）。
+# 使用前请确认本机 6379 端口未被占用（如已运行 D:\Redis，可先停止，
+# 或通过环境变量 REDIS_PORT=6380 修改宿主机映射端口并同步更新后端配置）。
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: sportseq-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  redis-data:

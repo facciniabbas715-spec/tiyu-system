@@ -1,6 +1,7 @@
 package com.company.sportseq.controller;
 
 import cn.hutool.json.JSONUtil;
+import com.company.sportseq.common.cache.CacheService;
 import com.company.sportseq.common.constant.CacheConstants;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,8 @@ class StatisticTest {
     private StringRedisTemplate redisTemplate;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private CacheService cacheService;
 
     @Test
     void summary_shouldReturnTodayCountsAndTotalValue() throws Exception {
@@ -198,6 +201,9 @@ class StatisticTest {
     }
 
     private void seed() {
+        // 本测试用 JDBC 直插数据，先清掉可能存在的汇总/热门器材缓存，保证断言基于最新数据
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
+        cacheService.evictByPattern(CacheConstants.USAGE_TOP_PATTERN);
         long catA = insertCategory(CAT_A, "统计测试-球类");
         long catB = insertCategory(CAT_B, "统计测试-田径");
         long eqA = insertEquipment(EQ_A, "统计测试-篮球", catA, "100.00", 5);

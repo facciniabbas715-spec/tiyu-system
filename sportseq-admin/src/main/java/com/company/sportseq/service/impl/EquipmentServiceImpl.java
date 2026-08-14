@@ -4,6 +4,7 @@ import com.alibaba.excel.EasyExcel;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.company.sportseq.common.cache.CacheService;
 import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
@@ -23,6 +24,7 @@ import com.company.sportseq.mapper.ScrapItemMapper;
 import com.company.sportseq.service.EquipmentService;
 import com.company.sportseq.vo.EquipmentVO;
 import com.company.sportseq.vo.ImportResultVO;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -46,10 +48,20 @@ public class EquipmentServiceImpl implements EquipmentService {
     private final BorrowItemMapper borrowItemMapper;
     private final ScrapItemMapper scrapItemMapper;
     private final StringRedisTemplate redisTemplate;
+    private final CacheService cacheService;
 
     @Override
     public PageResult<EquipmentVO> page(long current, long size, String equipmentName, String equipmentCode,
                                         Long categoryId, Integer status) {
+        String cacheKey = CacheConstants.equipmentListKey(
+                CacheConstants.hash(current, size, equipmentName, equipmentCode, categoryId, status));
+        return cacheService.getOrLoad(cacheKey, new TypeReference<>() {
+        }, CacheConstants.EQUIPMENT_LIST_TTL,
+                () -> loadPage(current, size, equipmentName, equipmentCode, categoryId, status));
+    }
+
+    private PageResult<EquipmentVO> loadPage(long current, long size, String equipmentName, String equipmentCode,
+                                             Long categoryId, Integer status) {
         Page<Equipment> page = equipmentMapper.selectPage(new Page<>(current, size),
                 Wrappers.<Equipment>lambdaQuery()
                         .like(StrUtil.isNotBlank(equipmentName), Equipment::getEquipmentName, equipmentName)
@@ -74,11 +86,14 @@ public class EquipmentServiceImpl implements EquipmentService {
 
     @Override
     public EquipmentVO detail(Long id) {
-        Equipment equipment = equipmentMapper.selectById(id);
+        return cacheService.getOrLoad(CacheConstants.equipmentDetailKey(id), new TypeReference<>() {
+        }, CacheConstants.EQUIPMENT_DETAIL_TTL, () -> {
+            Equipment equipment = equipmentMapper.selectById(id);
         if (equipment == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "器材不存在");
         }
-        return toVo(equipment);
+            return toVo(equipment);
+        });
     }
 
     @Override
@@ -89,6 +104,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         equipment.setEquipmentCode(generateCode(category.getCategoryCode()));
         equipment.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         equipmentMapper.insert(equipment);
+        cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
     }
 
     @Override
@@ -102,6 +118,9 @@ public class EquipmentServiceImpl implements EquipmentService {
         applyFields(equipment, dto);
         equipment.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         equipmentMapper.updateById(equipment);
+        cacheService.evict(CacheConstants.equipmentDetailKey(dto.getId()));
+        cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
     }
 
     @Override
@@ -127,6 +146,9 @@ public class EquipmentServiceImpl implements EquipmentService {
             throw new BizException(ErrorCode.EQUIPMENT_IN_USE, "器材存在未完结报废单，无法删除");
         }
         equipmentMapper.deleteById(id);
+        cacheService.evict(CacheConstants.equipmentDetailKey(id));
+        cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
     }
 
     @Override
@@ -135,6 +157,8 @@ public class EquipmentServiceImpl implements EquipmentService {
         update.setId(id);
         update.setStatus(status);
         equipmentMapper.updateById(update);
+        cacheService.evict(CacheConstants.equipmentDetailKey(id));
+        cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
     }
 
     @Override
@@ -196,11 +220,14 @@ public class EquipmentServiceImpl implements EquipmentService {
                 errors.add("第" + rowNum + "行: " + e.getMessage());
             }
         }
+        cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
         return new ImportResultVO(success, errors.size(), errors);
     }
 
     private EquipmentCategory validateCategory(Long categoryId) {
-        EquipmentCategory category = categoryMapper.selectById(categoryId);
+        EquipmentCategory category = cacheService.getOrLoad(CacheConstants.categoryKey(categoryId),
+                new TypeReference<>() {
+                }, CacheConstants.CATEGORY_TTL, () -> categoryMapper.selectById(categoryId));
         if (category == null || (category.getStatus() != null && category.getStatus() == 0)) {
             throw new BizException(ErrorCode.PARAM_ERROR, "器材分类不存在或已停用");
         }

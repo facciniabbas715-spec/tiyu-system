@@ -155,3 +155,13 @@ npm run build
 ## 10. 新会话启动语（建议）
 
 > 请先读取本仓库根目录的 `docs/handoff.md`、`README.md`，并执行 `git status`、`git log --oneline --graph -20`、`git tag` 确认当前状态；然后根据用户本次需求在 develop 分支（worktree 路径见第 2 节）推进；改动前后跑全量测试（`.\mvnw.cmd test`）与前端构建（`npm run type-check && npm run build`），完成后合并回 main 并打新版本标签推送 GitHub。
+
+## 13. Redis 业务缓存改造（2026-08-14）
+
+- 新增统一 Key 管理：`common/constant/CacheConstants`（业务缓存键 + TTL + 参数哈希），`common/cache/CacheService`（Cache Aside、SCAN 模式失效、事务提交后失效、异常降级直查 MySQL），业务代码不再散落 Redis Key 字符串。
+- 缓存范围：分类全量列表 `sportseq:category:list:all`、分类详情 `sportseq:category:{id}`、器材详情 `sportseq:equipment:detail:{id}`、器材分页 `sportseq:equipment:list:{md5}`、库存分页 `sportseq:stock:page:{md5}`、热门器材 `sportseq:statistics:usage:{md5}`、仪表盘汇总 `sportseq:dashboard:summary`；配置/字典改用统一 `sportseq:config` / `sportseq:dict` 命名空间。
+- 不缓存：借用/归还/报废/入库等业务单据分页（含数据权限、高频写入）、菜单路由（登录时按角色实时构建）、库存锁定数量（继续走 DB 原子 SQL）。
+- 一致性：器材/分类/仓库增删改时按需失效相关 Key；库存变更在盘点、入库验收、借用创建/发放/取消/驳回、归还确认、报废处置全部写路径执行“写前删除 + 事务提交后删除 + 60 秒短 TTL”双保险。
+- 配置：`application-dev.yml` 新增 `spring.data.redis`（`REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`/`REDIS_DATABASE` 可覆盖）；新增根目录 `docker-compose.yml`（仅 `redis:7.4-alpine`，本地开发依赖，非部署配置）。
+- 测试：新增 `BusinessCacheTest` 6 例（命中回填、统一 Key、写后失效）；`StatisticTest.seed` 前置清汇总/热门缓存以保证 JDBC 直插断言；后端全量 73/73 通过。
+- 环境备注：dev 库残留的历史测试数据（分类 AB、器材 AB-2026-000001、用户 yze）已清理；与本次缓存改动无关。

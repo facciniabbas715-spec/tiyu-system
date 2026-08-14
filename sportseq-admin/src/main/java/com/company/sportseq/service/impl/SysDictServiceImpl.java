@@ -3,6 +3,7 @@ package com.company.sportseq.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
@@ -49,7 +50,7 @@ public class SysDictServiceImpl implements SysDictService {
     }
 
     @Override
-    @CacheEvict(cacheNames = "dict", allEntries = true)
+    @CacheEvict(cacheNames = CacheConstants.DICT_CACHE, allEntries = true)
     public void updateType(DictTypeDTO dto) {
         if (dto.getId() == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "字典类型ID不能为空");
@@ -65,6 +66,7 @@ public class SysDictServiceImpl implements SysDictService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheConstants.DICT_CACHE, allEntries = true)
     public void removeType(Long id) {
         SysDictType type = typeMapper.selectById(id);
         if (type == null) {
@@ -88,7 +90,7 @@ public class SysDictServiceImpl implements SysDictService {
     }
 
     @Override
-    @CacheEvict(cacheNames = "dict", allEntries = true)
+    @CacheEvict(cacheNames = CacheConstants.DICT_CACHE, allEntries = true)
     public void addData(DictDataDTO dto) {
         SysDictData data = new SysDictData();
         applyData(data, dto);
@@ -96,7 +98,7 @@ public class SysDictServiceImpl implements SysDictService {
     }
 
     @Override
-    @CacheEvict(cacheNames = "dict", allEntries = true)
+    @CacheEvict(cacheNames = CacheConstants.DICT_CACHE, allEntries = true)
     public void updateData(DictDataDTO dto) {
         if (dto.getId() == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "字典数据ID不能为空");
@@ -108,12 +110,13 @@ public class SysDictServiceImpl implements SysDictService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheConstants.DICT_CACHE, allEntries = true)
     public void removeData(Long id) {
         dataMapper.deleteById(id);
     }
 
     @Override
-    @Cacheable(cacheNames = "dict", key = "'data:' + #dictType")
+    @Cacheable(cacheNames = CacheConstants.DICT_CACHE, key = "'data:' + #dictType")
     public List<SysDictData> listByType(String dictType) {
         return dataMapper.selectList(Wrappers.<SysDictData>lambdaQuery()
                 .eq(SysDictData::getDictType, dictType)
