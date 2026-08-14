@@ -12,4 +12,8 @@ public class AiServiceException extends BizException {
     public AiServiceException() {
         super(CODE, "AI 服务暂时不可用，请稍后重试");
     }
+
+    public AiServiceException(int code, String message) {
+        super(code, message);
+    }
 }

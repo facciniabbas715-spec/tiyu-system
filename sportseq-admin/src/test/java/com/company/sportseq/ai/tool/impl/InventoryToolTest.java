@@ -31,7 +31,7 @@ class InventoryToolTest {
         List<StockVO> rows = List.of(
                 new StockVO(7L, "BALL-2026-000001", "篮球", "球类", "个", 1L, "一号仓库", 10, 2, 5, false),
                 new StockVO(7L, "BALL-2026-000001", "篮球", "球类", "个", 2L, "二号仓库", 5, 1, 5, false));
-        when(service.page(1, 50, "篮球", null, null, null, false)).thenReturn(new PageResult<>(2, 1, 50, rows));
+        when(service.page(1, 100, "篮球", null, null, null, false)).thenReturn(new PageResult<>(2, 1, 100, rows));
         InventoryTool tool = new InventoryTool(service);
 
         AiToolOutcome outcome = tool.getEquipmentStock("篮球");
@@ -53,7 +53,7 @@ class InventoryToolTest {
         List<StockVO> rows = List.of(
                 new StockVO(7L, "BALL-2026-000001", "篮球", "球类", "个", 1L, "一号仓库", 10, 0, 5, false),
                 new StockVO(8L, "RKT-2026-000002", "羽毛球拍", "球类", "支", 1L, "一号仓库", 4, 1, 2, false));
-        when(service.page(1, 50, "球", null, null, null, false)).thenReturn(new PageResult<>(2, 1, 50, rows));
+        when(service.page(1, 100, "球", null, null, null, false)).thenReturn(new PageResult<>(2, 1, 100, rows));
         InventoryTool tool = new InventoryTool(service);
 
         AiToolOutcome outcome = tool.getEquipmentStock("球");
@@ -78,8 +78,8 @@ class InventoryToolTest {
     @Test
     void stock_shouldReturnMessageWhenNoStockRow() {
         StockService service = mock(StockService.class);
-        when(service.page(1, 50, "篮球", null, null, null, false))
-                .thenReturn(new PageResult<>(0, 1, 50, List.of()));
+        when(service.page(1, 100, "篮球", null, null, null, false))
+                .thenReturn(new PageResult<>(0, 1, 100, List.of()));
         InventoryTool tool = new InventoryTool(service);
 
         AiToolOutcome outcome = tool.getEquipmentStock("篮球");
@@ -92,7 +92,7 @@ class InventoryToolTest {
     @Test
     void stock_shouldReturnFriendlyErrorOnFailure() {
         StockService service = mock(StockService.class);
-        when(service.page(1, 50, "篮球", null, null, null, false))
+        when(service.page(1, 100, "篮球", null, null, null, false))
                 .thenThrow(new BizException(ErrorCode.SYSTEM_ERROR, "库存查询失败"));
         InventoryTool tool = new InventoryTool(service);
 
@@ -100,6 +100,33 @@ class InventoryToolTest {
 
         assertFalse(outcome.ok());
         assertTrue(outcome.message().contains("稍后重试"));
+    }
+
+    @Test
+    void stock_shouldAggregateAcrossAllPages() {
+        StockService service = mock(StockService.class);
+        List<StockVO> page1 = new java.util.ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            page1.add(new StockVO(7L, "BALL-2026-000001", "篮球", "球类", "个", 1L, "一号仓库", 1, 0, 5, false));
+        }
+        List<StockVO> page2 = new java.util.ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            page2.add(new StockVO(8L, "RKT-2026-000002", "羽毛球拍", "球类", "支", 1L, "一号仓库", 2, 0, 2, false));
+        }
+        when(service.page(1, 100, "球", null, null, null, false))
+                .thenReturn(new PageResult<>(150, 1, 100, page1));
+        when(service.page(2, 100, "球", null, null, null, false))
+                .thenReturn(new PageResult<>(150, 2, 100, page2));
+        InventoryTool tool = new InventoryTool(service);
+
+        AiToolOutcome outcome = tool.getEquipmentStock("球");
+
+        assertTrue(outcome.ok());
+        List<InventoryTool.EquipmentStockSummary> summaries = cast(outcome.data());
+        assertEquals(2, summaries.size());
+        InventoryTool.EquipmentStockSummary racket = summaries.get(1);
+        assertEquals("羽毛球拍", racket.equipmentName());
+        assertEquals(100, racket.totalQuantity());
     }
 
     @SuppressWarnings("unchecked")

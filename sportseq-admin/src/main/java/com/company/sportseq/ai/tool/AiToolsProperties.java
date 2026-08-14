@@ -15,4 +15,9 @@ public class AiToolsProperties {
      * 自动退回原有 RAG / 纯对话路径。
      */
     private boolean enabled = true;
+
+    /**
+     * 单次对话允许的最大工具调用轮数（模型每轮请求工具算一轮）。
+     */
+    private int maxToolCallIterations = 8;
 }

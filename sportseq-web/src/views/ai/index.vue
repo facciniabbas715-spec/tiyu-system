@@ -33,7 +33,7 @@
           <div class="message-content">
             <div class="message-bubble" :class="msg.role === 'user' ? 'bubble-user' : 'bubble-ai'">
               <span v-if="msg.loading" class="typing"><i /><i /><i /></span>
-              <span v-else class="message-bubble__text">{{ msg.content }}</span>
+              <span v-else class="message-bubble__text">{{ plainText(msg.content) }}</span>
             </div>
             <el-collapse v-if="msg.role === 'assistant' && !msg.loading && msg.debug" class="rag-debug">
               <el-collapse-item name="debug">
@@ -93,9 +93,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { ChatDotRound, Delete, Promotion, Service } from '@element-plus/icons-vue'
-import { sendChatMessage, type AiDebugVO } from '@/api/ai'
+import { clearAiHistory, getAiHistory, sendChatMessage, type AiDebugVO } from '@/api/ai'
 
 interface ChatMessage {
   id: number
@@ -116,6 +116,22 @@ const loading = ref(false)
 const messageListEl = ref<HTMLElement>()
 
 const canSend = computed(() => input.value.trim().length > 0 && !loading.value)
+
+onMounted(async () => {
+  try {
+    const history = await getAiHistory()
+    if (history?.length) {
+      const restored = history.map((item) => ({
+        id: nextId++,
+        role: item.role,
+        content: item.content,
+      }))
+      messages.value = [...restored, ...messages.value]
+    }
+  } catch {
+    // 历史加载失败不影响对话
+  }
+})
 
 async function send() {
   const text = input.value.trim()
@@ -144,7 +160,12 @@ async function send() {
   }
 }
 
-function clearChat() {
+async function clearChat() {
+  try {
+    await clearAiHistory()
+  } catch {
+    // 清空失败时仍清空本地展示
+  }
   messages.value = [{ id: nextId++, role: 'assistant', content: WELCOME_TEXT }]
   input.value = ''
 }
@@ -166,6 +187,13 @@ function intentLabel(intent: string) {
 
 function truncate(text: string, max = 300) {
   return text.length > max ? `${text.slice(0, max)}…` : text
+}
+
+function plainText(text: string) {
+  return text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*/g, '')
+    .replace(/`/g, '')
 }
 
 async function scrollToBottom() {

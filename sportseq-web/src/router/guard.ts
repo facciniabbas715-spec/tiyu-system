@@ -10,7 +10,7 @@ export function setupRouterGuard(router: Router): void {
     const token = getToken()
     if (token) {
       if (to.path === '/login') {
-        return { path: '/dashboard' }
+        return { path: '/statistics/dashboard' }
       }
       const userStore = useUserStore()
       const permissionStore = usePermissionStore()

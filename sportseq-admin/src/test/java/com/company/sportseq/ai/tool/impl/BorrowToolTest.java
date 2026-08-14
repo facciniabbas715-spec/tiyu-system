@@ -45,7 +45,7 @@ class BorrowToolTest {
                 "一号仓库", 2, 2, 0, LocalDate.of(2026, 8, 21), 1, 3, 1);
         BorrowOrderVO order = new BorrowOrderVO(965L, "JY20260814000298", 42L, "zhang", "张三",
                 1, "训练", LocalDate.of(2026, 8, 21), 2, 2, 0, null, null, null, List.of(item));
-        when(borrowService.myPage(1, 50, null)).thenReturn(new PageResult<>(1, 1, 50, List.of(order)));
+        when(borrowService.myPage(1, 100, null)).thenReturn(new PageResult<>(1, 1, 100, List.of(order)));
         BorrowTool tool = new BorrowTool(borrowService, configService);
 
         AiToolOutcome outcome = tool.getUserBorrowRecords(null);
@@ -60,7 +60,7 @@ class BorrowToolTest {
         assertEquals("篮球", record.items().get(0).equipmentName());
         assertTrue(record.items().get(0).overdue());
         assertEquals(3, record.items().get(0).overdueDays());
-        verify(borrowService).myPage(1, 50, null);
+        verify(borrowService).myPage(1, 100, null);
     }
 
     @Test
@@ -68,13 +68,13 @@ class BorrowToolTest {
         BorrowService borrowService = mock(BorrowService.class);
         SysConfigService configService = mock(SysConfigService.class);
         login(42L);
-        when(borrowService.myPage(1, 50, 2)).thenReturn(new PageResult<>(0, 1, 50, List.of()));
+        when(borrowService.myPage(1, 100, 2)).thenReturn(new PageResult<>(0, 1, 100, List.of()));
         BorrowTool tool = new BorrowTool(borrowService, configService);
 
         AiToolOutcome outcome = tool.getUserBorrowRecords(2);
 
         assertTrue(outcome.ok());
-        verify(borrowService).myPage(1, 50, 2);
+        verify(borrowService).myPage(1, 100, 2);
     }
 
     @Test
@@ -89,6 +89,32 @@ class BorrowToolTest {
         assertFalse(outcome.ok());
         assertTrue(outcome.message().contains("状态"));
         verify(borrowService, never()).myPage(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    void records_shouldCollectAcrossAllPages() {
+        BorrowService borrowService = mock(BorrowService.class);
+        SysConfigService configService = mock(SysConfigService.class);
+        login(42L);
+        List<BorrowOrderVO> page1 = new java.util.ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            page1.add(new BorrowOrderVO(1000L + i, "JY202608140000" + i, 42L, "zhang", "张三",
+                    1, "训练", null, 1, 2, 0, null, null, null, List.of()));
+        }
+        List<BorrowOrderVO> page2 = new java.util.ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            page2.add(new BorrowOrderVO(2000L + i, "JY202608140100" + i, 42L, "zhang", "张三",
+                    1, "训练", null, 1, 2, 0, null, null, null, List.of()));
+        }
+        when(borrowService.myPage(1, 100, null)).thenReturn(new PageResult<>(120, 1, 100, page1));
+        when(borrowService.myPage(2, 100, null)).thenReturn(new PageResult<>(120, 2, 100, page2));
+        BorrowTool tool = new BorrowTool(borrowService, configService);
+
+        AiToolOutcome outcome = tool.getUserBorrowRecords(null);
+
+        assertTrue(outcome.ok());
+        List<BorrowTool.BorrowRecordSummary> records = cast(outcome.data());
+        assertEquals(120, records.size());
     }
 
     @Test

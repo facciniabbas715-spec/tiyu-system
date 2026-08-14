@@ -7,7 +7,9 @@ import com.company.sportseq.service.StockService;
 import com.company.sportseq.vo.StockVO;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
@@ -19,10 +21,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
 import java.util.List;
@@ -32,6 +37,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -43,7 +51,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = {
         "spring.ai.rag.enabled=true",
         "spring.ai.rag.embedding.api-key=test-embedding-key",
-        "spring.ai.rag.debug-enabled=true"
+        "spring.ai.rag.debug-enabled=true",
+        "spring.ai.rate-limit.enabled=false"
 })
 @AutoConfigureMockMvc
 class AiChatToolCallingTest {
@@ -66,12 +75,22 @@ class AiChatToolCallingTest {
     @MockitoBean
     private VectorStore vectorStore;
 
+    @org.junit.jupiter.api.BeforeEach
+    void clearChatHistory() {
+        redisTemplate.delete("sportseq:ai:history:1");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void cleanupChatHistory() {
+        redisTemplate.delete("sportseq:ai:history:1");
+    }
+
     @Test
     void businessQuestion_shouldCallStockToolAndReturnRealData() throws Exception {
         List<StockVO> rows = List.of(new StockVO(7L, "BALL-2026-000001", "篮球", "球类",
                 "个", 1L, "一号仓库", 15, 3, 5, false));
-        when(stockService.page(1, 50, "篮球", null, null, null, false))
-                .thenReturn(new PageResult<>(1, 1, 50, rows));
+        when(stockService.page(1, 100, "篮球", null, null, null, false))
+                .thenReturn(new PageResult<>(1, 1, 100, rows));
         when(chatModel.call(any(Prompt.class)))
                 .thenReturn(toolCallResponse("call-1", "getEquipmentStock", "{\"equipmentName\":\"篮球\"}"))
                 .thenReturn(textResponse("篮球目前可用 12 个。"));
@@ -91,7 +110,7 @@ class AiChatToolCallingTest {
                 .andExpect(jsonPath("$.data.debug.knowledgeUsed").value(false));
 
         verify(chatModel, times(2)).call(any(Prompt.class));
-        verify(stockService).page(1, 50, "篮球", null, null, null, false);
+        verify(stockService).page(1, 100, "篮球", null, null, null, false);
     }
 
     @Test
@@ -146,6 +165,77 @@ class AiChatToolCallingTest {
                 .andExpect(jsonPath("$.data.debug.knowledgeUsed").value(false));
 
         verify(chatModel, times(1)).call(any(Prompt.class));
+    }
+
+    @Test
+    void chat_shouldKeepMultiTurnContextAndExposeHistoryApi() throws Exception {
+        String token = loginAdmin();
+        mockMvc.perform(delete("/api/ai/history")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.code").value(0));
+        when(chatModel.call(any(Prompt.class)))
+                .thenReturn(textResponse("默认最长借用天数是 15 天。"))
+                .thenReturn(textResponse("续借次数上限是 1 次。"));
+
+        mockMvc.perform(post("/api/ai/chat")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JSONUtil.toJsonStr(Map.of("message", "借用规则是什么？"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").value("默认最长借用天数是 15 天。"));
+
+        mockMvc.perform(post("/api/ai/chat")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JSONUtil.toJsonStr(Map.of("message", "那续借上限呢？"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").value("续借次数上限是 1 次。"));
+
+        ArgumentCaptor<Prompt> captor = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel, times(2)).call(captor.capture());
+        List<Message> second = captor.getAllValues().get(1).getInstructions();
+        assertTrue(second.stream().anyMatch(m -> "借用规则是什么？".equals(m.getText())),
+                "第二轮提示词应包含上一轮用户问题");
+        assertTrue(second.stream().anyMatch(m -> "默认最长借用天数是 15 天。".equals(m.getText())),
+                "第二轮提示词应包含上一轮助手回答");
+
+        mockMvc.perform(get("/api/ai/history")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.code").value(0))
+                .andExpect(jsonPath("$.data[0].role").value("user"))
+                .andExpect(jsonPath("$.data[0].content").value("借用规则是什么？"))
+                .andExpect(jsonPath("$.data[1].role").value("assistant"))
+                .andExpect(jsonPath("$.data[1].content").value("默认最长借用天数是 15 天。"));
+
+        mockMvc.perform(delete("/api/ai/history")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.code").value(0));
+    }
+
+    @Test
+    void chat_shouldMapUpstreamBusyError() throws Exception {
+        when(chatModel.call(any(Prompt.class))).thenThrow(new RestClientResponseException(
+                "busy", HttpStatusCode.valueOf(429), "Too Many Requests", null, new byte[0], null));
+        String token = loginAdmin();
+
+        mockMvc.perform(post("/api/ai/chat")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JSONUtil.toJsonStr(Map.of("message", "篮球怎么保养？"))))
+                .andExpect(jsonPath("$.code").value(3103));
+    }
+
+    @Test
+    void chat_shouldMapUpstreamTimeoutError() throws Exception {
+        when(chatModel.call(any(Prompt.class)))
+                .thenThrow(new ResourceAccessException("connect timed out"));
+        String token = loginAdmin();
+
+        mockMvc.perform(post("/api/ai/chat")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(JSONUtil.toJsonStr(Map.of("message", "篮球怎么保养？"))))
+                .andExpect(jsonPath("$.code").value(3104));
     }
 
     private ChatResponse toolCallResponse(String id, String name, String arguments) {

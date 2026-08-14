@@ -3,7 +3,7 @@ package com.company.sportseq.ai.config;
 import com.company.sportseq.ai.exception.AiNotConfiguredException;
 import com.company.sportseq.ai.tool.AiToolsProperties;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.ToolCallAdvisor;
+import org.springframework.ai.chat.client.advisor.api.BaseAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -28,7 +28,8 @@ import org.springframework.util.StringUtils;
  * 否则提供降级模型，保证应用与全量测试在未配置 Key 时也能正常启动。
  */
 @Configuration
-@EnableConfigurationProperties({AiProperties.class, AiToolsProperties.class})
+@EnableConfigurationProperties({AiProperties.class, AiToolsProperties.class,
+        AiRateLimitProperties.class, AiChatProperties.class})
 public class AiConfig {
 
     @Bean
@@ -58,14 +59,14 @@ public class AiConfig {
 
     @Bean
     public ChatClient aiChatClient(ChatModel chatModel, AiProperties properties,
+                                   AiToolsProperties toolsProperties,
                                    ObjectProvider<ToolCallingManager> toolCallingManagerProvider) {
         ToolCallingManager toolCallingManager = toolCallingManagerProvider.getIfAvailable(
                 () -> ToolCallingManager.builder().build());
         return ChatClient.builder(chatModel)
                 .defaultSystem(properties.getChat().getSystemPrompt())
-                .defaultAdvisors(ToolCallAdvisor.builder()
-                        .toolCallingManager(toolCallingManager)
-                        .build())
+                .defaultAdvisors(new BoundedToolCallAdvisor(toolCallingManager,
+                        BaseAdvisor.HIGHEST_PRECEDENCE + 300, toolsProperties.getMaxToolCallIterations()))
                 .build();
     }
 

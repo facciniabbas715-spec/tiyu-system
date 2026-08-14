@@ -2,13 +2,18 @@ package com.company.sportseq.ai.service.impl;
 
 import com.company.sportseq.ai.dto.AiChatDTO;
 import com.company.sportseq.ai.exception.AiNotConfiguredException;
+import com.company.sportseq.ai.exception.AiRateLimitedException;
 import com.company.sportseq.ai.exception.AiServiceException;
+import com.company.sportseq.ai.exception.AiToolCallLimitException;
 import com.company.sportseq.ai.service.AiChatPrompt;
+import com.company.sportseq.ai.service.AiChatHistoryService;
 import com.company.sportseq.ai.service.AiChatService;
+import com.company.sportseq.ai.service.AiRateLimiter;
 import com.company.sportseq.ai.tool.AiToolCatalog;
 import com.company.sportseq.ai.tool.AiToolTrace;
 import com.company.sportseq.ai.vo.AiChatVO;
 import com.company.sportseq.ai.vo.AiDebugVO;
+import com.company.sportseq.ai.vo.AiHistoryMessage;
 import com.company.sportseq.ai.vo.AiToolCallVO;
 import com.company.sportseq.knowledge.config.RagProperties;
 import com.company.sportseq.knowledge.service.RagService;
@@ -16,9 +21,16 @@ import com.company.sportseq.knowledge.vo.RagDebugVO;
 import com.company.sportseq.knowledge.vo.RagResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
+import org.springframework.web.client.RestClientResponseException;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -37,24 +49,38 @@ public class AiChatServiceImpl implements AiChatService {
 
     private final RagProperties ragProperties;
 
+    private final AiRateLimiter rateLimiter;
+
+    private final AiChatHistoryService historyService;
+
+    private final Environment environment;
+
     public AiChatServiceImpl(@Qualifier("aiChatClient") ChatClient chatClient,
                              RagService ragService,
                              AiToolCatalog toolCatalog,
-                             RagProperties ragProperties) {
+                             RagProperties ragProperties,
+                             AiRateLimiter rateLimiter,
+                             AiChatHistoryService historyService,
+                             Environment environment) {
         this.chatClient = chatClient;
         this.ragService = ragService;
         this.toolCatalog = toolCatalog;
         this.ragProperties = ragProperties;
+        this.rateLimiter = rateLimiter;
+        this.historyService = historyService;
+        this.environment = environment;
     }
 
     @Override
     public AiChatVO chat(AiChatDTO dto) {
+        rateLimiter.check();
         String question = dto.getMessage();
-        boolean debugEnabled = ragProperties.isDebugEnabled();
+        boolean debugEnabled = ragProperties.isDebugEnabled() && !isProdProfile();
         AiToolTrace.begin(debugEnabled);
         try {
             if (!toolCatalog.callbacks().isEmpty()) {
                 String content = callWithTools(question);
+                historyService.append(question, content);
                 return new AiChatVO(content, toolDebug(question, content));
             }
             if (ragService.isReady()) {
@@ -69,8 +95,17 @@ public class AiChatServiceImpl implements AiChatService {
             return new AiChatVO(answer, debugEnabled
                     ? new AiDebugVO(question, "CHAT", List.of(), false, List.of(), answer)
                     : null);
-        } catch (AiNotConfiguredException e) {
+        } catch (AiRateLimitedException | AiToolCallLimitException | AiNotConfiguredException e) {
             throw e;
+        } catch (RestClientResponseException e) {
+            log.error("AI 上游响应异常", e);
+            if (e.getRawStatusCode() == 429) {
+                throw new AiServiceException(3103, "AI 服务繁忙（触发上游限流），请稍后再试");
+            }
+            throw new AiServiceException();
+        } catch (ResourceAccessException e) {
+            log.error("AI 上游连接异常", e);
+            throw new AiServiceException(3104, "AI 服务连接超时，请稍后重试");
         } catch (Exception e) {
             log.error("AI 客服调用失败", e);
             throw new AiServiceException();
@@ -80,13 +115,27 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     private String callWithTools(String question) {
+        List<Message> history = historyService.load().stream()
+                .map(AiChatServiceImpl::toMessage)
+                .toList();
         String content = chatClient.prompt()
                 .system(AiChatPrompt.TOOL_SYSTEM_PROMPT)
+                .messages(history)
                 .user(question)
                 .toolCallbacks(toolCatalog.callbacks())
                 .call()
                 .content();
         return content == null || content.isBlank() ? "" : content;
+    }
+
+    private static Message toMessage(AiHistoryMessage historyMessage) {
+        return "user".equals(historyMessage.role())
+                ? new UserMessage(historyMessage.content())
+                : new AssistantMessage(historyMessage.content());
+    }
+
+    private boolean isProdProfile() {
+        return Arrays.asList(environment.getActiveProfiles()).contains("prod");
     }
 
     private AiDebugVO toolDebug(String question, String answer) {

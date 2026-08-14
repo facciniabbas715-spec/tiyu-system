@@ -112,6 +112,10 @@ D:\Redis\redis-cli.exe GET "sportseq:equipment:detail:1"
 
 侧边栏进入「AI客服」即可对话。AI 会自动区分两类问题：知识类（怎么保养、怎么借、规则流程）走 RAG 知识库检索；业务数据类（现在有多少库存、我借了什么、什么时候归还）通过受控工具查询真实业务数据库，再由模型组织成自然语言。
 
+支持多轮对话：最近 8 条消息按用户隔离缓存在 Redis（默认 30 分钟过期），追问无需重复背景；页面刷新后历史自动恢复，「清空对话」同时清空服务端历史。
+
+内置防护：每个用户每分钟默认限流 20 次提问（可配置）；单次对话的工具调用轮数默认上限 8 轮，防止异常模型无限调用；回答要求纯文本输出，前端也会做轻量排版清理。
+
 ### 业务工具与安全边界
 
 | 工具 | 用途 | 所需权限 |
@@ -151,6 +155,13 @@ $env:AI_EMBEDDING_DIMENSIONS="1024"                                    # 需与�
 
 # AI 工具调用总开关（可选，默认开启）
 $env:AI_TOOLS_ENABLED="true"          # 关闭后客服退回 RAG / 纯对话路径
+$env:AI_TOOL_MAX_ITERATIONS="8"       # 单次对话最大工具调用轮数
+
+# 多轮记忆与限流（可选）
+$env:AI_CHAT_HISTORY_ENABLED="true"   # 多轮对话记忆（Redis）
+$env:AI_CHAT_HISTORY_TTL_SECONDS="1800"
+$env:AI_RATE_LIMIT_ENABLED="true"     # 用户级提问限流
+$env:AI_RATE_LIMIT_MAX_PER_MINUTE="20"
 ```
 
 设置环境变量后重启后端，使用 `admin / admin123` 登录；先在「知识库」页导入内置知识库，再到「AI客服」页提问即可。
