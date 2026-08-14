@@ -1,6 +1,8 @@
 package com.company.sportseq.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.company.sportseq.common.cache.CacheService;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.dto.WarehouseDTO;
@@ -29,6 +31,7 @@ public class WarehouseServiceImpl implements WarehouseService {
     private final StockInOrderMapper stockInOrderMapper;
     private final ReturnOrderMapper returnOrderMapper;
     private final ScrapOrderMapper scrapOrderMapper;
+    private final CacheService cacheService;
 
     @Override
     public List<Warehouse> list() {
@@ -42,6 +45,7 @@ public class WarehouseServiceImpl implements WarehouseService {
         Warehouse warehouse = new Warehouse();
         applyFields(warehouse, dto);
         warehouseMapper.insert(warehouse);
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
     }
 
     @Override
@@ -54,6 +58,7 @@ public class WarehouseServiceImpl implements WarehouseService {
         warehouse.setId(dto.getId());
         applyFields(warehouse, dto);
         warehouseMapper.updateById(warehouse);
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
     }
 
     @Override
@@ -79,6 +84,7 @@ public class WarehouseServiceImpl implements WarehouseService {
             throw new BizException(ErrorCode.PARAM_ERROR, "仓库存在报废单，无法删除");
         }
         warehouseMapper.deleteById(id);
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
     }
 
     private void checkCodeUnique(String warehouseCode, Long excludeId) {

@@ -3,6 +3,8 @@ package com.company.sportseq.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.company.sportseq.common.cache.CacheService;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
@@ -21,6 +23,7 @@ import com.company.sportseq.security.SecurityUtils;
 import com.company.sportseq.service.StockService;
 import com.company.sportseq.vo.StockRecordVO;
 import com.company.sportseq.vo.StockVO;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,10 +43,20 @@ public class StockServiceImpl implements StockService {
     private final EquipmentCategoryMapper categoryMapper;
     private final WarehouseMapper warehouseMapper;
     private final StockRecordMapper recordMapper;
+    private final CacheService cacheService;
 
     @Override
     public PageResult<StockVO> page(long current, long size, String equipmentName, String equipmentCode,
                                     Long warehouseId, Long categoryId, Boolean warningOnly) {
+        String cacheKey = CacheConstants.stockPageKey(
+                CacheConstants.hash(current, size, equipmentName, equipmentCode, warehouseId, categoryId, warningOnly));
+        return cacheService.getOrLoad(cacheKey, new TypeReference<>() {
+        }, CacheConstants.STOCK_PAGE_TTL,
+                () -> loadPage(current, size, equipmentName, equipmentCode, warehouseId, categoryId, warningOnly));
+    }
+
+    private PageResult<StockVO> loadPage(long current, long size, String equipmentName, String equipmentCode,
+                                         Long warehouseId, Long categoryId, Boolean warningOnly) {
         Page<EquipmentStock> page = stockMapper.selectPage(new Page<>(current, size),
                 Wrappers.<EquipmentStock>lambdaQuery()
                         .eq(warehouseId != null, EquipmentStock::getWarehouseId, warehouseId)
@@ -115,6 +128,7 @@ public class StockServiceImpl implements StockService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void adjust(StockAdjustDTO dto) {
+        evictStockCaches();
         if (dto.getChangeQuantity() == 0) {
             throw new BizException(ErrorCode.PARAM_ERROR, "调整数量不能为0");
         }
@@ -159,6 +173,13 @@ public class StockServiceImpl implements StockService {
         record.setCreateBy(userId);
         record.setCreateTime(LocalDateTime.now());
         recordMapper.insert(record);
+        cacheService.evictAfterCommit(this::evictStockCaches);
+    }
+
+    /** 库存是实时数据：写前删除 + 事务提交后再删除，配合短 TTL 双重保证一致性 */
+    private void evictStockCaches() {
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 
     private boolean filterEquipment(Long equipmentId, String name, String code, Long categoryId,

@@ -3,6 +3,8 @@ package com.company.sportseq.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.company.sportseq.common.cache.CacheService;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
@@ -69,6 +71,7 @@ public class ReturnServiceImpl implements ReturnService {
     private final SysConfigService configService;
     private final StringRedisTemplate redisTemplate;
     private final DataScopeService dataScopeService;
+    private final CacheService cacheService;
 
     @Override
     public PageResult<ReturnOrderVO> page(long current, long size, String orderNo, Integer status) {
@@ -172,6 +175,7 @@ public class ReturnServiceImpl implements ReturnService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void confirm(Long id) {
+        evictStockCaches();
         ReturnOrder order = getOrder(id);
         checkDataScope(order);
         if (order.getStatus() != STATUS_PENDING) {
@@ -253,6 +257,7 @@ public class ReturnServiceImpl implements ReturnService {
         orderUpdate.setConfirmBy(userId);
         orderUpdate.setConfirmTime(LocalDateTime.now());
         returnOrderMapper.updateById(orderUpdate);
+        cacheService.evictAfterCommit(this::evictStockCaches);
     }
 
     @Override
@@ -271,6 +276,11 @@ public class ReturnServiceImpl implements ReturnService {
     private int getQuantity(Long equipmentId, Long warehouseId) {
         var stock = stockMapper.selectForUpdate(equipmentId, warehouseId);
         return stock == null ? 0 : stock.getQuantity();
+    }
+
+    private void evictStockCaches() {
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 
     private ReturnOrder getOrder(Long id) {

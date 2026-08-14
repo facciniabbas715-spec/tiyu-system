@@ -1,6 +1,8 @@
 package com.company.sportseq.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.company.sportseq.common.cache.CacheService;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.mapper.StatisticMapper;
@@ -13,6 +15,7 @@ import com.company.sportseq.vo.EquipmentUsageVO;
 import com.company.sportseq.vo.OverdueItemVO;
 import com.company.sportseq.vo.OverdueStatVO;
 import com.company.sportseq.vo.WarehouseStockVO;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -42,9 +45,15 @@ public class StatisticServiceImpl implements StatisticService {
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final StatisticMapper statisticMapper;
+    private final CacheService cacheService;
 
     @Override
     public DashboardSummaryVO summary() {
+        return cacheService.getOrLoad(CacheConstants.DASHBOARD_SUMMARY_KEY, new TypeReference<>() {
+        }, CacheConstants.DASHBOARD_SUMMARY_TTL, this::loadSummary);
+    }
+
+    private DashboardSummaryVO loadSummary() {
         Map<String, Object> row = statisticMapper.summary();
         return new DashboardSummaryVO(
                 longVal(row.get("todayBorrowCount")),
@@ -99,13 +108,18 @@ public class StatisticServiceImpl implements StatisticService {
     @Override
     public List<EquipmentUsageVO> equipmentUsageTop(String startDate, String endDate) {
         Range range = resolveRange(startDate, endDate);
-        return statisticMapper.equipmentUsageTop(USAGE_TOP_N, dateStr(range.start()), dateStr(range.end())).stream()
+        String cacheKey = CacheConstants.usageTopKey(
+                CacheConstants.hash(dateStr(range.start()), dateStr(range.end())));
+        return cacheService.getOrLoad(cacheKey, new TypeReference<>() {
+        }, CacheConstants.USAGE_TOP_TTL,
+                () -> statisticMapper.equipmentUsageTop(USAGE_TOP_N,
+                        dateStr(range.start()), dateStr(range.end())).stream()
                 .map(row -> new EquipmentUsageVO(
                         StrUtil.toString(row.get("equipmentCode")),
                         StrUtil.toString(row.get("equipmentName")),
                         StrUtil.toString(row.get("categoryName")),
                         longVal(row.get("borrowCount"))))
-                .toList();
+                .toList());
     }
 
     @Override

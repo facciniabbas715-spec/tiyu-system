@@ -3,6 +3,8 @@ package com.company.sportseq.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.company.sportseq.common.cache.CacheService;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
@@ -53,6 +55,7 @@ public class StockInServiceImpl implements StockInService {
     private final EquipmentMapper equipmentMapper;
     private final WarehouseMapper warehouseMapper;
     private final StringRedisTemplate redisTemplate;
+    private final CacheService cacheService;
 
     @Override
     public PageResult<StockInVO> page(long current, long size, String orderNo, Integer status) {
@@ -138,6 +141,7 @@ public class StockInServiceImpl implements StockInService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void receive(Long id) {
+        evictStockCaches();
         StockInOrder order = getOrder(id);
         checkStatus(order, STATUS_APPROVED, "审核通过后才能验收");
         Long userId = SecurityUtils.getUserId();
@@ -175,6 +179,7 @@ public class StockInServiceImpl implements StockInService {
         update.setReceiveBy(userId);
         update.setReceiveTime(LocalDateTime.now());
         orderMapper.updateById(update);
+        cacheService.evictAfterCommit(this::evictStockCaches);
     }
 
     @Override
@@ -201,6 +206,11 @@ public class StockInServiceImpl implements StockInService {
             throw new BizException(ErrorCode.PARAM_ERROR, "入库单不存在");
         }
         return order;
+    }
+
+    private void evictStockCaches() {
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 
     private void checkStatus(StockInOrder order, int expected, String message) {

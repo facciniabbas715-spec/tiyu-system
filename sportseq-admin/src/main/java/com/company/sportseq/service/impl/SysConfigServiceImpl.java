@@ -3,6 +3,7 @@ package com.company.sportseq.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
@@ -40,7 +41,7 @@ public class SysConfigServiceImpl implements SysConfigService {
     }
 
     @Override
-    @CacheEvict(cacheNames = "config", allEntries = true)
+    @CacheEvict(cacheNames = CacheConstants.CONFIG_CACHE, allEntries = true)
     public void update(ConfigDTO dto) {
         if (dto.getId() == null) {
             throw new BizException(ErrorCode.PARAM_ERROR, "参数ID不能为空");
@@ -53,13 +54,13 @@ public class SysConfigServiceImpl implements SysConfigService {
     }
 
     @Override
-    @CacheEvict(cacheNames = "config", allEntries = true)
+    @CacheEvict(cacheNames = CacheConstants.CONFIG_CACHE, allEntries = true)
     public void remove(Long id) {
         configMapper.deleteById(id);
     }
 
     @Override
-    @Cacheable(cacheNames = "config", key = "#configKey")
+    @Cacheable(cacheNames = CacheConstants.CONFIG_CACHE, key = "#configKey")
     public String getValueByKey(String configKey) {
         SysConfig config = configMapper.selectOne(
                 Wrappers.<SysConfig>lambdaQuery().eq(SysConfig::getConfigKey, configKey));

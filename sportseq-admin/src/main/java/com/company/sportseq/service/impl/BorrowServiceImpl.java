@@ -3,6 +3,8 @@ package com.company.sportseq.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.company.sportseq.common.cache.CacheService;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
@@ -66,6 +68,7 @@ public class BorrowServiceImpl implements BorrowService {
     private final SysConfigService configService;
     private final StringRedisTemplate redisTemplate;
     private final DataScopeService dataScopeService;
+    private final CacheService cacheService;
 
     @Override
     public PageResult<BorrowOrderVO> page(long current, long size, String orderNo, String username,
@@ -101,6 +104,7 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void create(BorrowOrderDTO dto) {
+        evictStockCaches();
         Long userId = SecurityUtils.getUserId();
         SysUser user = userMapper.selectById(userId);
         BorrowOrder order = new BorrowOrder();
@@ -139,6 +143,7 @@ public class BorrowServiceImpl implements BorrowService {
             item.setOverdueDays(0);
             itemMapper.insert(item);
         }
+        cacheService.evictAfterCommit(this::evictStockCaches);
     }
 
     @Override
@@ -156,12 +161,15 @@ public class BorrowServiceImpl implements BorrowService {
         orderMapper.updateById(update);
         if (!Boolean.TRUE.equals(dto.getPass())) {
             unlockItems(order.getId(), userId);
+            evictStockCaches();
         }
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void issue(Long id) {
+        evictStockCaches();
+        cacheService.evictByPattern(CacheConstants.USAGE_TOP_PATTERN);
         BorrowOrder order = getOrder(id);
         checkDataScope(order);
         checkStatus(order, STATUS_APPROVED, "审核通过后才能领用");
@@ -206,6 +214,7 @@ public class BorrowServiceImpl implements BorrowService {
         update.setIssueBy(userId);
         update.setIssueTime(LocalDateTime.now());
         orderMapper.updateById(update);
+        cacheService.evictAfterCommit(this::evictBorrowWriteCaches);
     }
 
     @Override
@@ -232,6 +241,7 @@ public class BorrowServiceImpl implements BorrowService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void cancel(Long id) {
+        evictStockCaches();
         BorrowOrder order = getOrder(id);
         checkDataScope(order);
         checkStatus(order, STATUS_PENDING, "仅待审核状态可取消");
@@ -240,6 +250,17 @@ public class BorrowServiceImpl implements BorrowService {
         update.setId(order.getId());
         update.setStatus(STATUS_CANCELED);
         orderMapper.updateById(update);
+        cacheService.evictAfterCommit(this::evictStockCaches);
+    }
+
+    private void evictBorrowWriteCaches() {
+        evictStockCaches();
+        cacheService.evictByPattern(CacheConstants.USAGE_TOP_PATTERN);
+    }
+
+    private void evictStockCaches() {
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 
     private void unlockItems(Long orderId, Long userId) {

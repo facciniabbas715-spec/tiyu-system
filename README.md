@@ -75,3 +75,31 @@ npm run build
 - [项目设计文档](docs/design/体育器材管理系统-设计文档.md)
 - [实施计划](docs/superpowers/plans/)（按开发阶段拆分）
 - [开发交接文档](docs/handoff.md)
+
+## Redis 缓存
+
+业务缓存采用 Cache Aside：查询先读 Redis，未命中回源 MySQL 并写回 Redis；写操作更新数据库后使相关缓存失效。所有缓存键统一在 `sportseq-admin/src/main/java/com/company/sportseq/common/constant/CacheConstants.java` 中管理（命名空间前缀 `sportseq:`）。库存等实时数据使用短 TTL + 写前/事务提交后双失效保证一致性；Redis 不可用时自动降级为直查 MySQL。
+
+### 启动 Redis
+
+方式一：Docker（仅本地开发依赖，Redis 7，不包含应用服务）
+
+```powershell
+docker compose up -d redis
+```
+
+方式二：本机 Windows Redis
+
+```powershell
+D:\Redis\redis-server.exe D:\Redis\redis.windows.conf
+```
+
+### 验证 Redis 生效
+
+```powershell
+# 访问一次器材列表/详情后检查对应缓存键
+D:\Redis\redis-cli.exe KEYS "sportseq:equipment:*"
+D:\Redis\redis-cli.exe GET "sportseq:equipment:detail:1"
+```
+
+连接参数可用环境变量覆盖：`REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`REDIS_DATABASE`。

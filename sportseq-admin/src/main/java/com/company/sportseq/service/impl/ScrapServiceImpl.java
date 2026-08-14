@@ -3,6 +3,8 @@ package com.company.sportseq.service.impl;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.company.sportseq.common.cache.CacheService;
+import com.company.sportseq.common.constant.CacheConstants;
 import com.company.sportseq.common.exception.BizException;
 import com.company.sportseq.common.exception.ErrorCode;
 import com.company.sportseq.common.result.PageResult;
@@ -55,6 +57,7 @@ public class ScrapServiceImpl implements ScrapService {
     private final EquipmentMapper equipmentMapper;
     private final WarehouseMapper warehouseMapper;
     private final StringRedisTemplate redisTemplate;
+    private final CacheService cacheService;
 
     @Override
     public PageResult<ScrapOrderVO> page(long current, long size, String orderNo, Integer status) {
@@ -131,6 +134,7 @@ public class ScrapServiceImpl implements ScrapService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void dispose(ScrapDisposeDTO dto) {
+        evictStockCaches();
         ScrapOrder order = getOrder(dto.getOrderId());
         checkStatus(order, STATUS_APPROVED, "审核通过后才能处置");
         Long userId = SecurityUtils.getUserId();
@@ -165,6 +169,7 @@ public class ScrapServiceImpl implements ScrapService {
         update.setDisposeMethod(dto.getDisposeMethod());
         update.setRemark(dto.getRemark());
         orderMapper.updateById(update);
+        cacheService.evictAfterCommit(this::evictStockCaches);
     }
 
     @Override
@@ -185,6 +190,11 @@ public class ScrapServiceImpl implements ScrapService {
             throw new BizException(ErrorCode.PARAM_ERROR, "报废单不存在");
         }
         return order;
+    }
+
+    private void evictStockCaches() {
+        cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 
     private void checkStatus(ScrapOrder order, int expected, String message) {
