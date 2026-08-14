@@ -26,6 +26,7 @@
 - **2026-08-10 已做第一版存档**：`main` 已合并 develop 全部实现（311 个文件），打标签 `v1.0.0` 并推送到 GitHub 公开仓库 `facciniabbas715-spec/tiyu-system`。
 - **2026-08-14 Redis 业务缓存 v2.0.0**：develop `feat: integrate redis cache` 已合并回 `main`，打标签 `v2.0.0` 并推送 GitHub。
 - **2026-08-14 AI 智能客服 v3.0.0**：develop `feat: add spring ai chatbot` 与 Redis 缓存加固（`fix: complete dashboard summary cache invalidation`、`fix: harden cache key hashing and throttle redis failure logs`）已合并回 `main`，打标签 `v3.0.0` 并推送 GitHub。
+- **2026-08-14 RAG 知识库 v3.1.0**：develop `feat: implement rag knowledge base` 已合并回 `main`，打标签 `v3.1.0` 并推送 GitHub。
 - `develop`（worktree）与 `main` 当前内容一致（develop 分支本身未推送远端，需要时再推）。
 - 约定：commit 编号与主计划对应；日常开发在 `develop` 提交，`main` 只接受 release 合并；后续大升级完成后合并回 `main` 并打新版本标签（如 `v1.1.0`）再推送。
 
@@ -175,3 +176,17 @@ npm run build
 4. **菜单**：Flyway V4 新增 `sys_menu` id=800（`/ai` → `ai/index`，perms `ai:chat`），并给 role_id=1 授权；其他角色在「角色管理」按需分配。
 5. **前端**：`src/api/ai.ts` + `src/views/ai/index.vue`（对话区/左右气泡/输入框/发送/Loading/清空），请求超时 60s。
 6. **测试**：新增 `AiChatTest`（桩模型验证接口/认证/参数/系统提示词）与 `AiChatNotConfiguredTest`（无 Key 友好降级）；全量后端 78/78、前端 type-check/build、冒烟 11 项、Playwright 实测「AI客服」页面均通过。
+
+## 15. RAG 知识库升级（2026-08-14，develop 未合并）
+
+1. **选型**：五种向量方案对比后选 **Redis Stack（Redis Vector）**——复用既有 Redis、单容器、规模匹配、Spring AI 官方 `spring-ai-redis-store` 一等支持；代码面向 `VectorStore` 接口，未来切 Qdrant 只需换依赖+配置。Milvus（etcd+minio）、Elasticsearch（资源重）、pgvector（引入第二数据库）不推荐。
+2. **后端模块**：独立包 `com.company.sportseq.knowledge`（controller/service/loader/splitter/embedding/vector/config/entity/mapper/dto/vo/exception），不侵入器材业务。写入链路：上传保存 → 解析（txt/md=TextReader；docx=POI XWPFWordExtractor；pdf=Spring AI PDFBox）→ TokenTextSplitter 切分（中文标点断句）→ 写 chunk → Embedding → 向量入库。问答链路：Embedding → 相似度检索（topK=4、threshold=0.7）→ 无命中直接返回「知识库中暂无相关信息。」（不调 LLM）→ 有命中注入严格约束 Prompt → 低温生成。
+3. **数据库**：Flyway V5 新增 `knowledge_document`（逻辑删除）、`knowledge_chunk`（物理删除）；菜单 id=801（`/knowledge` → `knowledge/index`，perms `knowledge:manage`，授权 role 1）。向量存 Redis，MySQL 不存向量。
+4. **接口**：`/api/knowledge/documents/{page,{id},upload,{id}(PUT),{id}(DELETE),{id}/rebuild,seed}`，权限 `knowledge:manage`；`POST /api/ai/chat` 自动走 RAG（`AiChatVO{content,debug}`，debug 仅 dev）。
+5. **配置**：`spring.ai.rag.*`（enabled/topK/threshold/chunkSize/debug/upload-dir/vector.type）；Embedding 独立于聊天：`AI_EMBEDDING_API_KEY/API_BASE_URL/MODEL/DIMENSIONS`（默认回落 AI_*）。**DeepSeek 无 Embedding 接口**，本机已配：聊天=DeepSeek `deepseek-chat`，向量化=百炼 `text-embedding-v3`（1024 维，需 `AI_EMBEDDING_DIMENSIONS=1024`）。
+6. **向量库双模式**：`spring.ai.rag.vector.type=redis`（默认，需 Redis Stack，docker-compose 已换 `redis/redis-stack-server:7.4.0-v0`）；dev profile 用 `simple`（PersistentSimpleVectorStore 内存+JSON 持久化，本机无 Docker 的兜底，生产不用）。
+7. **前端**：`src/views/knowledge/index.vue`（上传/列表/详情分块/删除/重建/内置导入）、`src/api/knowledge/index.ts`；`ai/index.vue` 展示 RAG 检索详情（dev）。
+8. **内置知识**：`sportseq-admin/src/main/resources/knowledge/*.md` 共 11 篇（使用说明/借用/归还/损坏/维护/分类/篮球/足球/羽毛球/乒乓球/网球），内容与真实状态机一致；`POST /api/knowledge/documents/seed` 导入。
+9. **踩坑与处理**：Tika 3.x 引入 POI 5.x 与 EasyExcel POI 4.1.2/xmlbeans 冲突（CTWorkbook NoClassDefFoundError）→ 弃 Tika，docx 用 POI 4.1.2、pdf 用 spring-ai-pdf-document-reader；dev 库残留用户 `yze`（测试数据）已软删除（del_flag=1）以稳定 `SysPermissionTest`。
+10. **验证**：后端全量 **137/137** 通过；前端 type-check/build 通过；冒烟脚本新增知识库分页检查；新增 `scripts/rag-verify.ps1`（UTF-8 BOM，真实 seed+Embedding+检索+聊天端到端验证）。
+11. **发布状态**：已提交 `feat: implement rag knowledge base`，并合并回 main、打标签 v3.1.0、推送 GitHub。后续生产上线前设 `RAG_VECTOR_STORE=redis` 并部署 Redis Stack；如需把 develop 也推到远端可再补推。

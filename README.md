@@ -5,7 +5,7 @@
 ## 技术栈
 
 - 前端：Vue 3 + Vite + TypeScript + Element Plus + Pinia + Vue Router + Axios + ECharts
-- 后端：Spring Boot 3.5 + Spring Security（JWT + Redis）+ MyBatis-Plus + MySQL 8.0 + Flyway + EasyExcel + Spring AI（AI 智能客服）
+- 后端：Spring Boot 3.5 + Spring Security（JWT + Redis）+ MyBatis-Plus + MySQL 8.0 + Flyway + EasyExcel + Spring AI（AI 智能客服 + RAG 知识库）
 
 ## 目录结构
 
@@ -108,9 +108,17 @@ D:\Redis\redis-cli.exe GET "sportseq:equipment:detail:1"
 
 连接参数可用环境变量覆盖：`REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`REDIS_DATABASE`。
 
-## AI 智能客服（第一阶段）
+## AI 智能客服（已接入 RAG 知识库）
 
-侧边栏进入「AI客服」即可对话。当前为无状态单轮对话，暂未接入知识库（RAG 为下一阶段）。
+侧边栏进入「AI客服」即可对话。回答基于系统知识库检索结果：知识库没有相关资料时明确回复「知识库中暂无相关信息。」，不让模型自行编造规则。开发环境（dev profile）会在回答下方展示「RAG 检索详情」（query、检索片段、相似度、最终回答），生产环境不返回这些内部信息。
+
+### 知识库管理
+
+侧边栏进入「知识库」可管理知识文档：
+
+- 上传文档（txt / md / docx / pdf）：系统自动完成 解析 → 文本切分 → Embedding → 写入向量库；
+- 查看文档详情与知识分块、删除文档、更新标题/备注或替换文件、重新构建向量；
+- 「导入内置知识库」一键导入 11 篇内置器材知识（使用说明、借用/归还/损坏/维护规则、分类说明、篮球/足球/羽毛球/乒乓球/网球知识）。
 
 ### 配置
 
@@ -120,10 +128,35 @@ D:\Redis\redis-cli.exe GET "sportseq:equipment:detail:1"
 $env:AI_API_KEY="sk-xxxx"                       # 必填，未配置时对话接口返回友好提示（code=3101）
 $env:AI_BASE_URL="https://api.openai.com"       # 可选，DeepSeek: https://api.deepseek.com；DashScope: https://dashscope.aliyuncs.com/compatible-mode/v1
 $env:AI_MODEL="gpt-4o-mini"                     # 可选，例如 deepseek-chat / qwen-plus
+
+# RAG 向量化（Embedding）：DeepSeek 不提供 Embedding 接口，需单独配置支持 Embedding 的服务
+$env:AI_EMBEDDING_API_KEY="sk-xxxx"                                   # 默认回落到 AI_API_KEY
+$env:AI_EMBEDDING_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
+$env:AI_EMBEDDING_MODEL="text-embedding-v3"                            # OpenAI 可用 text-embedding-3-small
+$env:AI_EMBEDDING_DIMENSIONS="1024"                                    # 需与模型实际维度一致（DashScope v3=1024）
 ```
 
-设置环境变量后重启后端，使用 `admin / admin123` 登录，在「AI客服」页输入问题即可。
+设置环境变量后重启后端，使用 `admin / admin123` 登录；先在「知识库」页导入内置知识库，再到「AI客服」页提问即可。
 
 ### 接口
 
 `POST /api/ai/chat`，请求 `{ "message": "篮球怎么借？" }`，响应 `{ "code": 0, "data": { "content": "..." } }`。
+
+### 向量数据库
+
+默认使用 **Redis Stack（Redis Vector）**：复用现有 Redis，单容器部署，RediSearch + RedisJSON 内置，Spring AI 官方 `spring-ai-redis-store` 集成。普通 Redis 5/6/7 没有 RediSearch 模块，本地可用 Docker 启动：
+
+```powershell
+docker compose up -d redis   # 已配置 redis/redis-stack-server:7.4.0-v0
+```
+
+本机没有 Docker 时，dev profile 自动切换为内存向量库兜底（`spring.ai.rag.vector.type=simple`，JSON 持久化到 `data/knowledge/vector-store.json`），接口与 Redis 实现完全一致，适合开发验证；生产/部署建议使用 Redis（环境变量 `RAG_VECTOR_STORE=redis`）。
+
+### 验证 RAG 确实生效
+
+```powershell
+# 后端启动后（Redis 6379 已运行）：
+.\scripts\rag-verify.ps1
+```
+
+脚本会真实走完：导入内置知识库 → 提问「篮球应该怎么保养？」（校验命中知识库并接地回答）→ 提问知识库外问题（校验固定回复「知识库中暂无相关信息。」，证明没有让模型胡编）。

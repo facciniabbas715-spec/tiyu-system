@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
  * MyBatis-Plus 配置：分页、乐观锁、审计字段自动填充。
  */
 @Configuration
-@MapperScan("com.company.sportseq.mapper")
+@MapperScan({ "com.company.sportseq.mapper", "com.company.sportseq.knowledge.mapper" })
 public class MybatisPlusConfig {
 
     @Bean

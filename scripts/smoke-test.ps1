@@ -150,6 +150,11 @@ Check 'GET /api/stock/page' {
     if ($r.code -ne 0 -or $null -eq $r.data.records) { throw '库存分页返回异常' }
 }
 
+Check 'GET /api/knowledge/documents/page（RAG 知识库）' {
+    $r = Get-Api '/api/knowledge/documents/page?current=1&size=5'
+    if ($r.code -ne 0 -or $null -eq $r.data.records) { throw '知识库分页返回异常' }
+}
+
 Check '未认证访问受保护接口应返回 401' {
     try {
         Invoke-WebRequest -Uri "$BaseUrl/api/dashboard/summary" -TimeoutSec 10 | Out-Null
