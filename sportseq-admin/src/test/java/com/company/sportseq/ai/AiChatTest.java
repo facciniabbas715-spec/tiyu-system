@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * AI 智能客服集成测试：使用桩 ChatModel 验证接口契约、认证、参数校验与消息拼装。
  */
-@SpringBootTest
+@SpringBootTest(properties = "spring.ai.rag.enabled=false")
 @AutoConfigureMockMvc
 class AiChatTest {
 

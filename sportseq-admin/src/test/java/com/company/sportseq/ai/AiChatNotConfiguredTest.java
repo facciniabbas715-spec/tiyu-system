@@ -22,7 +22,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * 未配置 AI_API_KEY 时的降级行为：应用正常启动，对话接口返回友好提示而非 500。
  */
-@SpringBootTest
+@SpringBootTest(properties = {
+        "spring.ai.rag.enabled=false",
+        "spring.ai.openai.api-key="
+})
 @AutoConfigureMockMvc
 class AiChatNotConfiguredTest {
 

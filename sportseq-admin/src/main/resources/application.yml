@@ -1,5 +1,9 @@
 server:
   port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
 
 spring:
   application:
@@ -33,6 +37,31 @@ spring:
       audio:
         speech: none
         transcription: none
+    # ---------------------------------------------------------------
+    # RAG 知识库（knowledge 模块）。向量库默认复用业务 Redis（需 Redis Stack）。
+    # 生产环境 debug-enabled 必须为 false，避免暴露检索片段等内部信息。
+    # ---------------------------------------------------------------
+    rag:
+      enabled: true
+      debug-enabled: false
+      upload-dir: ${RAG_UPLOAD_DIR:./data/knowledge}
+      top-k: ${RAG_TOP_K:4}
+      similarity-threshold: ${RAG_SIMILARITY_THRESHOLD:0.7}
+      chunk-size: ${RAG_CHUNK_SIZE:400}
+      max-file-size: ${RAG_MAX_FILE_SIZE:10485760}
+      embedding:
+        base-url: ${AI_EMBEDDING_BASE_URL:${AI_BASE_URL:https://api.openai.com}}
+        api-key: ${AI_EMBEDDING_API_KEY:${AI_API_KEY:}}
+        model: ${AI_EMBEDDING_MODEL:text-embedding-3-small}
+        dimensions: ${AI_EMBEDDING_DIMENSIONS:}
+      vector:
+        type: ${RAG_VECTOR_STORE:redis}
+        host: ${REDIS_HOST:localhost}
+        port: ${REDIS_PORT:6379}
+        password: ${REDIS_PASSWORD:}
+        index-name: sportseq-knowledge-index
+        prefix: "sportseq:knowledge:chunk:"
+        persist-path: ${RAG_VECTOR_PERSIST_PATH:./data/knowledge/vector-store.json}
     openai:
       api-key: ${AI_API_KEY:}
       base-url: ${AI_BASE_URL:https://api.openai.com}

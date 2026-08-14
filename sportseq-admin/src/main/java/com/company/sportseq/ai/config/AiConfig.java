@@ -30,10 +30,7 @@ public class AiConfig {
     @Bean
     @Conditional(ApiKeyConfiguredCondition.class)
     public ChatModel openAiChatModel(AiProperties properties) {
-        OpenAiApi openAiApi = OpenAiApi.builder()
-                .baseUrl(properties.getBaseUrl())
-                .apiKey(new SimpleApiKey(properties.getApiKey()))
-                .build();
+        OpenAiApi openAiApi = buildOpenAiApi(properties.getBaseUrl(), properties.getApiKey());
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .model(properties.getChat().getOptions().getModel())
                 .temperature(properties.getChat().getOptions().getTemperature())
@@ -60,6 +57,26 @@ public class AiConfig {
         return ChatClient.builder(chatModel)
                 .defaultSystem(properties.getChat().getSystemPrompt())
                 .build();
+    }
+
+    /**
+     * 构建 OpenAI 兼容协议客户端。
+     *
+     * <p>Spring 的 WebClient 会把 API 路径追加到 baseUrl 之后；当网关已自带版本前缀
+     * （如 DashScope 的 {@code https://dashscope.aliyuncs.com/compatible-mode/v1}）时，
+     * 必须去掉 Spring AI 默认路径里的 {@code /v1}，否则会拼成双 {@code /v1} 导致 404。</p>
+     */
+    public static OpenAiApi buildOpenAiApi(String baseUrl, String apiKey) {
+        String normalized = baseUrl != null && baseUrl.endsWith("/")
+                ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        OpenAiApi.Builder builder = OpenAiApi.builder()
+                .baseUrl(normalized)
+                .apiKey(new SimpleApiKey(apiKey));
+        if (normalized != null && normalized.endsWith("/v1")) {
+            builder.completionsPath("/chat/completions")
+                    .embeddingsPath("/embeddings");
+        }
+        return builder.build();
     }
 
     /**

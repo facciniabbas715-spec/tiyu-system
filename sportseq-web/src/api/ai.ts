@@ -6,6 +6,24 @@ export interface AiChatDTO {
 
 export interface AiChatVO {
   content: string
+  debug: RagDebugVO | null
+}
+
+export interface RagHitVO {
+  documentId: number | null
+  title: string | null
+  chunkIndex: number | null
+  content: string
+  similarity: number | null
+}
+
+export interface RagDebugVO {
+  query: string
+  knowledgeUsed: boolean
+  topK: number
+  similarityThreshold: number
+  hits: RagHitVO[]
+  answer: string
 }
 
 /**

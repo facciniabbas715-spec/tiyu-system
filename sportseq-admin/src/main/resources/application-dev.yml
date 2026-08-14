@@ -7,6 +7,13 @@ spring:
       database: ${REDIS_DATABASE:0}
       connect-timeout: 3s
       timeout: 5s
+  ai:
+    rag:
+      # 开发环境返回 RAG 调试信息（query/检索片段/相似度/最终回答）；生产保持 false
+      debug-enabled: true
+      vector:
+        # 本机无 Docker/Redis Stack 时用内存向量库兜底（JSON 持久化）；生产/部署改回 redis
+        type: simple
   datasource:
     type: com.alibaba.druid.pool.DruidDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
