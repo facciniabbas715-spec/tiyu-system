@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
 /**
@@ -28,8 +29,12 @@ import java.util.function.Supplier;
 @RequiredArgsConstructor
 public class CacheService {
 
+    /** Redis 故障日志限流窗口：同一窗口内只输出一条 WARN，避免宕机期间刷屏。 */
+    private static final long WARN_THROTTLE_MILLIS = 30_000;
+
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+    private final AtomicLong lastWarnAt = new AtomicLong();
 
     public <T> Optional<T> get(String key, TypeReference<T> type) {
         try {
@@ -39,7 +44,7 @@ public class CacheService {
             }
             return Optional.ofNullable(objectMapper.readValue(json, type));
         } catch (Exception e) {
-            log.warn("读取 Redis 缓存失败, key={}", key, e);
+            logFailure("读取 Redis 缓存失败, key=" + key, e);
             return Optional.empty();
         }
     }
@@ -61,7 +66,7 @@ public class CacheService {
         try {
             redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(value), ttl);
         } catch (Exception e) {
-            log.warn("写入 Redis 缓存失败, key={}", key, e);
+            logFailure("写入 Redis 缓存失败, key=" + key, e);
         }
     }
 
@@ -72,7 +77,7 @@ public class CacheService {
         try {
             redisTemplate.delete(Arrays.asList(keys));
         } catch (Exception e) {
-            log.warn("删除 Redis 缓存失败, keys={}", Arrays.toString(keys), e);
+            logFailure("删除 Redis 缓存失败, keys=" + Arrays.toString(keys), e);
         }
     }
 
@@ -89,7 +94,19 @@ public class CacheService {
                 redisTemplate.delete(keys);
             }
         } catch (Exception e) {
-            log.warn("按模式删除 Redis 缓存失败, pattern={}", pattern, e);
+            logFailure("按模式删除 Redis 缓存失败, pattern=" + pattern, e);
+        }
+    }
+
+    /** 故障日志限流：窗口内首次失败打 WARN（含堆栈），其余只留 DEBUG 详情。 */
+    private void logFailure(String message, Exception e) {
+        log.debug(message, e);
+        long now = System.currentTimeMillis();
+        long last = lastWarnAt.get();
+        if (last == 0 || now - last >= WARN_THROTTLE_MILLIS) {
+            if (lastWarnAt.compareAndSet(last, now)) {
+                log.warn(message, e);
+            }
         }
     }
 

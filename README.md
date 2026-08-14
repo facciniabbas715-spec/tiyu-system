@@ -94,6 +94,10 @@ docker compose up -d redis
 D:\Redis\redis-server.exe D:\Redis\redis.windows.conf
 ```
 
+> 两种方式都会占用 6379 端口，不能同时运行。若本机 Redis 已在运行，可让容器改用 6380：
+> `$env:REDIS_PORT=6380; docker compose up -d redis`，并把后端环境变量同步设为 `REDIS_PORT=6380`。
+> 容器健康状态可用 `docker inspect --format "{{.State.Health.Status}}" sportseq-redis` 查看（应为 healthy）。
+
 ### 验证 Redis 生效
 
 ```powershell
