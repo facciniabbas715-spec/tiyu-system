@@ -1,6 +1,7 @@
 package com.company.sportseq.ai.config;
 
 import com.company.sportseq.ai.exception.AiNotConfiguredException;
+import com.company.sportseq.ai.tool.AiToolsProperties;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -24,7 +25,7 @@ import org.springframework.util.StringUtils;
  * 否则提供降级模型，保证应用与全量测试在未配置 Key 时也能正常启动。
  */
 @Configuration
-@EnableConfigurationProperties(AiProperties.class)
+@EnableConfigurationProperties({AiProperties.class, AiToolsProperties.class})
 public class AiConfig {
 
     @Bean
