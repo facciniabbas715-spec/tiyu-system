@@ -25,18 +25,19 @@ import Navbar from './components/Navbar/index.vue'
 }
 
 .sidebar {
-  background: #001529;
+  background: #faf9f7;
+  border-right: 1px solid #e6e3dd;
   overflow-x: hidden;
 }
 
 .navbar {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: 1px solid #e6e3dd;
   background: #fff;
 }
 
 .app-main {
-  background: #f0f2f5;
+  background: #f5f5f5;
 }
 </style>

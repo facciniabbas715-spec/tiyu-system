@@ -11,18 +11,18 @@
     </div>
 
     <el-table :data="orderList" border>
-      <el-table-column prop="orderNo" label="借用单号" width="180" />
+      <el-table-column prop="orderNo" label="借用单号" width="160" />
       <el-table-column prop="realName" label="借用人" width="100" />
-      <el-table-column prop="purpose" label="用途" min-width="140" show-overflow-tooltip />
+      <el-table-column prop="purpose" label="用途" min-width="120" show-overflow-tooltip />
       <el-table-column prop="expectedReturnDate" label="预计归还" width="110" />
       <el-table-column prop="totalQuantity" label="数量" width="70" />
-      <el-table-column label="状态" width="100">
+      <el-table-column label="状态" width="90">
         <template #default="{ row }">
           <el-tag :type="statusTag(row.status)">{{ statusMap[row.status] }}</el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="createTime" label="申请时间" width="170" />
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button v-permission="['borrow:audit']" v-if="row.status === 0" link type="primary" @click="handleAudit(row, true)">通过</el-button>
           <el-button v-permission="['borrow:audit']" v-if="row.status === 0" link type="danger" @click="handleAudit(row, false)">驳回</el-button>

@@ -37,7 +37,7 @@
       <el-table-column prop="spec" label="规格" width="100" />
       <el-table-column prop="unit" label="单位" width="60" />
       <el-table-column prop="purchasePrice" label="单价" width="90" />
-      <el-table-column prop="safeStock" label="安全库存" width="90" />
+      <el-table-column prop="safeStock" label="安全库存" width="100" />
       <el-table-column label="状态" width="80">
         <template #default="{ row }">
           <el-tag :type="row.status === 1 ? 'success' : 'danger'">{{ row.status === 1 ? '正常' : '停用' }}</el-tag>

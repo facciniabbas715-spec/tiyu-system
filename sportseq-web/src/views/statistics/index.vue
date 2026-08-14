@@ -59,19 +59,19 @@
       <template #header>逾期统计</template>
       <el-row :gutter="12" class="overdue-cards">
         <el-col :xs="24" :sm="8">
-          <div class="overdue-card">
+          <div class="overdue-card overdue-card--coral">
             <div class="overdue-card__label">逾期单数</div>
             <div class="overdue-card__value">{{ overdue.overdueOrderCount }}</div>
           </div>
         </el-col>
         <el-col :xs="24" :sm="8">
-          <div class="overdue-card">
+          <div class="overdue-card overdue-card--amber">
             <div class="overdue-card__label">平均逾期天数</div>
             <div class="overdue-card__value">{{ overdue.avgOverdueDays }}</div>
           </div>
         </el-col>
         <el-col :xs="24" :sm="8">
-          <div class="overdue-card">
+          <div class="overdue-card overdue-card--ink">
             <div class="overdue-card__label">违约金合计(元)</div>
             <div class="overdue-card__value">{{ overdue.penaltyTotal }}</div>
           </div>
@@ -127,6 +127,23 @@ const usageChartEl = ref<HTMLDivElement>()
 let trendChart: echarts.ECharts | null = null
 let usageChart: echarts.ECharts | null = null
 
+const CHART_TEXT = '#4a453f'
+const CHART_MUTED = '#797267'
+const CHART_AXIS_LINE = '#e6e3dd'
+const CHART_SPLIT_LINE = '#f0eee9'
+
+function chartTooltip(extra: Record<string, unknown> = {}) {
+  return {
+    backgroundColor: '#ffffff',
+    borderColor: '#e6e3dd',
+    borderWidth: 1,
+    padding: [8, 12] as [number, number],
+    textStyle: { color: '#221f1c', fontSize: 13 },
+    extraCssText: 'box-shadow: 0 10px 15px -3px rgba(34,31,28,0.12); border-radius: 8px;',
+    ...extra,
+  }
+}
+
 function rangeParams(): RangeParams {
   return dateRange.value
     ? { startDate: dateRange.value[0], endDate: dateRange.value[1] }
@@ -152,17 +169,39 @@ async function loadAll() {
 function renderTrend(rows: BorrowTrendItem[]) {
   if (!trendChart) return
   trendChart.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['借用数量', '归还数量'], top: 0 },
+    tooltip: chartTooltip({ trigger: 'axis' }),
+    title: rows.length
+      ? undefined
+      : {
+          text: '暂无数据',
+          left: 'center',
+          top: 'middle',
+          textStyle: { color: '#8c8a88', fontSize: 13, fontWeight: 400 },
+        },
+    legend: { data: ['借用数量', '归还数量'], top: 0, textStyle: { color: CHART_TEXT } },
     grid: { left: 40, right: 16, top: 40, bottom: 28 },
-    xAxis: { type: 'category', boundaryGap: false, data: rows.map((row) => row.month) },
-    yAxis: { type: 'value' },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: rows.map((row) => row.month),
+      axisLabel: { color: CHART_MUTED },
+      axisLine: { lineStyle: { color: CHART_AXIS_LINE } },
+      axisTick: { show: false },
+    },
+    yAxis: {
+      type: 'value',
+      axisLabel: { color: CHART_MUTED },
+      splitLine: { lineStyle: { color: CHART_SPLIT_LINE } },
+    },
     series: [
       {
         name: '借用数量',
         type: 'line',
         smooth: true,
-        itemStyle: { color: '#409eff' },
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: { width: 2, color: '#518bdb' },
+        itemStyle: { color: '#518bdb' },
         areaStyle: { opacity: 0.08 },
         data: rows.map((row) => row.borrowQuantity),
       },
@@ -170,7 +209,10 @@ function renderTrend(rows: BorrowTrendItem[]) {
         name: '归还数量',
         type: 'line',
         smooth: true,
-        itemStyle: { color: '#67c23a' },
+        symbol: 'circle',
+        symbolSize: 6,
+        lineStyle: { width: 2, color: '#36bab8' },
+        itemStyle: { color: '#36bab8' },
         areaStyle: { opacity: 0.08 },
         data: rows.map((row) => row.returnQuantity),
       },
@@ -182,20 +224,35 @@ function renderUsage(rows: EquipmentUsageItem[]) {
   if (!usageChart) return
   const sorted = [...rows].reverse()
   usageChart.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    tooltip: chartTooltip({ trigger: 'axis', axisPointer: { type: 'shadow' } }),
+    title: rows.length
+      ? undefined
+      : {
+          text: '暂无数据',
+          left: 'center',
+          top: 'middle',
+          textStyle: { color: '#8c8a88', fontSize: 13, fontWeight: 400 },
+        },
     grid: { left: 110, right: 24, top: 16, bottom: 24 },
-    xAxis: { type: 'value', minInterval: 1 },
+    xAxis: {
+      type: 'value',
+      minInterval: 1,
+      axisLabel: { color: CHART_MUTED },
+      splitLine: { lineStyle: { color: CHART_SPLIT_LINE } },
+    },
     yAxis: {
       type: 'category',
       data: sorted.map((row) => row.equipmentName),
-      axisLabel: { width: 90, overflow: 'truncate' },
+      axisLabel: { width: 90, overflow: 'truncate', color: CHART_MUTED },
+      axisLine: { lineStyle: { color: CHART_AXIS_LINE } },
+      axisTick: { show: false },
     },
     series: [
       {
         name: '借用次数',
         type: 'bar',
         barMaxWidth: 16,
-        itemStyle: { color: '#722ed1', borderRadius: [0, 4, 4, 0] },
+        itemStyle: { color: '#bf89cd', borderRadius: [0, 6, 6, 0] },
         data: sorted.map((row) => row.borrowCount),
       },
     ],
@@ -264,21 +321,43 @@ onBeforeUnmount(() => {
 }
 
 .overdue-card {
-  padding: 16px;
-  border-radius: 6px;
-  background: #f5f7fa;
-  text-align: center;
+  padding: 16px 18px;
+  border-radius: 12px;
+
+  &--coral {
+    background: #f9edec;
+  }
+
+  &--amber {
+    background: #f6f0e9;
+  }
+
+  &--ink {
+    background: #f2f1f0;
+  }
 
   &__label {
     font-size: 13px;
-    color: #909399;
+    color: #797267;
     margin-bottom: 6px;
   }
 
   &__value {
     font-size: 26px;
-    font-weight: 600;
-    color: #f56c6c;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+
+    .overdue-card--coral & {
+      color: #c64a45;
+    }
+
+    .overdue-card--amber & {
+      color: #a66a24;
+    }
+
+    .overdue-card--ink & {
+      color: #221f1c;
+    }
   }
 }
 </style>
