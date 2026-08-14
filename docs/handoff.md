@@ -32,7 +32,8 @@
 - **2026-08-14 AI 智能客服 v3.0.0**：develop `feat: add spring ai chatbot` 与 Redis 缓存加固（`fix: complete dashboard summary cache invalidation`、`fix: harden cache key hashing and throttle redis failure logs`）已合并回 `main`，打标签 `v3.0.0` 并推送 GitHub。
 - **2026-08-14 RAG 知识库 v3.1.0**：develop `feat: implement rag knowledge base` 已合并回 `main`，打标签 `v3.1.0` 并推送 GitHub。
 - **2026-08-14 AI 客服最终升级 v3.2.0**：`develop` 上 M1-M4 四个提交（工具层基座 / 业务工具 / 对话编排 / 配置文档）已合并回 `main`，打标签 `v3.2.0` 并推送 GitHub。
-- `develop`（worktree）与 `main` 当前内容一致（develop 分支本身未推送远端，需要时再推）。
+- **2026-08-14 前端 UI 调整 v3.3.0**：develop `style: apply Micro light theme to web UI (visual-only restyle)` 已合并回 `main`，打标签 `v3.3.0` 并推送 GitHub。
+- `develop`（worktree）已合并回 `main` 并发布；develop 分支本身未推送远端，需要时再推。
 - 约定：commit 编号与主计划对应；日常开发在 `develop` 提交，`main` 只接受 release 合并；后续大升级完成后合并回 `main` 并打新版本标签（如 `v1.1.0`）再推送。
 
 中危项处理提交：commit 18（用户会话踢出）、19（器材删除校验）、20（仓库删除校验）、21（admin 角色保护）、22（菜单成环校验）、23（借用分页 SQL 过滤）、24（列表 N+1 批量优化），详见第 11 节。
@@ -210,7 +211,7 @@ npm run build
 
 10. **P2/P3 审查整改（2026-08-14）**：新增用户级提问限流（`spring.ai.rate-limit.*`，Redis 分钟桶，超限 3105）；多轮对话记忆（`spring.ai.chat.history.*`，Redis 按用户隔离 + TTL，`GET/DELETE /api/ai/history`，前端刷新恢复、清空对话同步清理）；工具循环硬上限（`BoundedToolCallAdvisor`，`spring.ai.tools.max-tool-call-iterations` 默认 8，超限 3106——Spring AI 1.1.8 原生循环无上限）；上游 429/超时区分错误码 3103/3104；库存/借阅工具跨页全量聚合（每页 100）；`getEquipmentDetail` 不再向模型透出采购价；提示词禁止 Markdown + 前端纯文本清理；登录/守卫/首页统一落地 `/statistics/dashboard`（旧 `/dashboard` 保留为跳转别名）。发布状态：已合并 main、打标签 v3.2.1 并推送 GitHub。
 
-## 17. 前端 Micro 主题 UI 优化（2026-08-14，develop 未合并）
+## 17. 前端 Micro 主题 UI 优化（2026-08-14，已合并 main 并发布 v3.3.0）
 
 1. **目标**：依据仓库根目录 `DESIGN (1).md`（Micro — Style Reference）优化前端视觉，**不改动任何业务功能**（无接口/路由/权限/字段变化）。
 2. **主题落地**：`src/styles/index.scss` 集中定义 Micro 令牌并覆盖 Element Plus CSS 变量（暖白画布、墨黑文字、蔚蓝主色、8/14/18px 圆角、发丝线边框、双层柔和阴影）；成功/警告/危险语义色加深以通过 4.5:1 文字对比度。
