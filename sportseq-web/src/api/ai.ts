@@ -6,7 +6,7 @@ export interface AiChatDTO {
 
 export interface AiChatVO {
   content: string
-  debug: RagDebugVO | null
+  debug: AiDebugVO | null
 }
 
 export interface RagHitVO {
@@ -17,11 +17,17 @@ export interface RagHitVO {
   similarity: number | null
 }
 
-export interface RagDebugVO {
+export interface AiToolCallVO {
+  name: string
+  arguments: string
+  result: string
+}
+
+export interface AiDebugVO {
   query: string
+  intent: string
+  toolCalls: AiToolCallVO[]
   knowledgeUsed: boolean
-  topK: number
-  similarityThreshold: number
   hits: RagHitVO[]
   answer: string
 }

@@ -96,6 +96,20 @@ class RagServiceTest {
     }
 
     @Test
+    void retrieve_shouldDelegateToVectorStoreSearch() {
+        VectorStoreService vectorStore = mock(VectorStoreService.class);
+        when(vectorStore.search(QUESTION)).thenReturn(List.of(HIT));
+        RagService service = new RagServiceImpl(vectorStore, mock(ChatClient.class),
+                new RagPromptBuilder(), properties(false));
+
+        List<RagHitVO> hits = service.retrieve(QUESTION);
+
+        assertEquals(1, hits.size());
+        assertEquals(HIT, hits.get(0));
+        verify(vectorStore).search(QUESTION);
+    }
+
+    @Test
     void isReady_shouldRequireEnabledAndApiKey() {
         RagService service = new RagServiceImpl(mock(VectorStoreService.class),
                 mock(ChatClient.class), new RagPromptBuilder(), properties(false));

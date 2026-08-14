@@ -6,6 +6,8 @@
 
 系统已完成阶段 0-11（脚手架、数据库、认证、权限、系统管理、器材基础、库存入库、借用归还、报废、统计分析、本地联调加固）及第 8 节中危项处理清单（commit 18-24），后端 **65 个集成测试全绿**，前端构建通过，本地冒烟测试全通过；**暂不部署上线**，后续按需迭代维护。
 
+2026-08-14 完成「AI 客服最终升级（RAG + 业务数据 + Tool Calling，v3.2.0）」：AI 能区分知识类与业务数据类问题，知识走 RAG、业务走受控工具层查真实数据，详见第 16 节。
+
 ## 2. 环境基线（重要）
 
 | 项 | 值 |
@@ -27,6 +29,7 @@
 - **2026-08-14 Redis 业务缓存 v2.0.0**：develop `feat: integrate redis cache` 已合并回 `main`，打标签 `v2.0.0` 并推送 GitHub。
 - **2026-08-14 AI 智能客服 v3.0.0**：develop `feat: add spring ai chatbot` 与 Redis 缓存加固（`fix: complete dashboard summary cache invalidation`、`fix: harden cache key hashing and throttle redis failure logs`）已合并回 `main`，打标签 `v3.0.0` 并推送 GitHub。
 - **2026-08-14 RAG 知识库 v3.1.0**：develop `feat: implement rag knowledge base` 已合并回 `main`，打标签 `v3.1.0` 并推送 GitHub。
+- **2026-08-14 AI 客服最终升级 v3.2.0**：`develop` 上 M1-M4 四个提交（工具层基座 / 业务工具 / 对话编排 / 配置文档）已合并回 `main`，打标签 `v3.2.0` 并推送 GitHub。
 - `develop`（worktree）与 `main` 当前内容一致（develop 分支本身未推送远端，需要时再推）。
 - 约定：commit 编号与主计划对应；日常开发在 `develop` 提交，`main` 只接受 release 合并；后续大升级完成后合并回 `main` 并打新版本标签（如 `v1.1.0`）再推送。
 
@@ -190,3 +193,15 @@ npm run build
 9. **踩坑与处理**：Tika 3.x 引入 POI 5.x 与 EasyExcel POI 4.1.2/xmlbeans 冲突（CTWorkbook NoClassDefFoundError）→ 弃 Tika，docx 用 POI 4.1.2、pdf 用 spring-ai-pdf-document-reader；dev 库残留用户 `yze`（测试数据）已软删除（del_flag=1）以稳定 `SysPermissionTest`。
 10. **验证**：后端全量 **137/137** 通过；前端 type-check/build 通过；冒烟脚本新增知识库分页检查；新增 `scripts/rag-verify.ps1`（UTF-8 BOM，真实 seed+Embedding+检索+聊天端到端验证）。
 11. **发布状态**：已提交 `feat: implement rag knowledge base`，并合并回 main、打标签 v3.1.0、推送 GitHub。后续生产上线前设 `RAG_VECTOR_STORE=redis` 并部署 Redis Stack；如需把 develop 也推到远端可再补推。
+
+## 16. AI 客服最终升级：RAG + 业务数据 + Tool Calling（2026-08-14，已合并 main 并发布 v3.2.0）
+
+1. **目标**：让 AI 客服区分「知识类问题」（怎么保养/怎么借/规则流程 → RAG）与「业务数据类问题」（库存多少/我借了什么/何时归还 → 真实业务库），并在不开放 SQL、不允许写库、全部经 Service 层、全部工具鉴权的前提下实现。
+2. **架构**：对话由「无条件 RAG」升级为「单循环工具路由」——RAG 检索也做成工具 `searchKnowledge`，与业务工具一起交给模型选择，一次 Tool Calling 循环完成意图判断、取数、组织回答；无工具时回退 RAG / 纯 LLM。注意：`ChatClient` 手动构建时必须显式挂 `ToolCallAdvisor`（Spring AI 1.1.8 不自动装配）。
+3. **工具层**（`com.company.sportseq.ai.tool`）：`AiTool` 标记接口 + `@AiToolPermission` 声明所需权限 + `AiToolPermissionService` 鉴权 + `PermissionAwareToolCallback` 执行前统一强制鉴权 + `AiToolCatalog` 白名单目录（未声明权限/无 `@Tool` 方法的工具启动即报错）。
+4. **业务工具**（`ai.tool.impl`）：`KnowledgeTool.searchKnowledge`（登录即可）、`InventoryTool.getEquipmentStock`（`stock:list`，可用=在库-锁定）、`BorrowTool.getUserBorrowRecords`（登录即可，userId 服务端绑定）/`getBorrowRule`（真实 sys_config 参数）、`EquipmentTool.getEquipmentDetail`/`searchEquipment`（`equipment:list`）。全部只调 Service 只读方法，无 SQL、无写库。
+5. **编排与调试**：`AiChatServiceImpl` 按 工具 → RAG → 纯 LLM 三级回退；提示词 `AiChatPrompt.TOOL_SYSTEM_PROMPT` 强制只用工具结果作答、禁止编造；dev 环境 `AiDebugVO` 返回意图（KNOWLEDGE/BUSINESS/MIXED/CHAT）、工具调用链、知识命中片段（ThreadLocal 追踪，生产为 null）。
+6. **配置**：`spring.ai.tools.enabled`（环境变量 `AI_TOOLS_ENABLED`，默认开）；`application.yml` 的 `chat.system-prompt` 仅用于回退路径。
+7. **提交**：`a93054d` 设计文档 → `78c64a3` M1 工具层基座 → `e0e2eeb` M2 业务工具 → `5451e9f` M3 对话编排 → M4（本次 docs/配置/验证脚本提交）。
+8. **验证**：后端全量测试 173/173（45 套件，M3 时点），前端 type-check/build 通过；`scripts/ai-tools-verify.ps1`（UTF-8 BOM）提供知识题/库存题/借阅题三链路真机验证（需 `AI_API_KEY`）。
+9. **已知口径**：库存/器材工具受 `stock:list` / `equipment:list` 权限约束，无权限角色会得到「无权限」答复而非数据；`rag-verify.ps1` 在新流程下仍然有效（工具模式下知识库外问题同样返回固定文案）。
