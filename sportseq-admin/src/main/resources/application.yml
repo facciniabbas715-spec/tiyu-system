@@ -14,6 +14,33 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     validate-on-migrate: true
+  # ---------------------------------------------------------------
+  # AI 智能客服（Spring AI 1.1.x，OpenAI 兼容协议）
+  # API Key 只能通过环境变量 AI_API_KEY 提供，禁止写死在配置或代码中。
+  # 常用 OpenAI 兼容服务商：
+  #   OpenAI  : AI_BASE_URL=https://api.openai.com
+  #   DeepSeek: AI_BASE_URL=https://api.deepseek.com            AI_MODEL=deepseek-chat
+  #   DashScope: AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1  AI_MODEL=qwen-plus
+  # ---------------------------------------------------------------
+  ai:
+    # 关闭 Spring AI OpenAI starter 的自动装配，统一由 ai/config/AiConfig 手动构建：
+    # 未配置 AI_API_KEY 时应用仍可正常启动，/api/ai/chat 会返回友好提示。
+    model:
+      chat: none
+      embedding: none
+      image: none
+      moderation: none
+      audio:
+        speech: none
+        transcription: none
+    openai:
+      api-key: ${AI_API_KEY:}
+      base-url: ${AI_BASE_URL:https://api.openai.com}
+      chat:
+        system-prompt: "你是“体育器材智能客服”，隶属于体育器材管理系统，负责回答器材档案、库存、入库、借用归还、报废处置、统计分析等与体育器材管理相关的问题。请遵守：1) 使用简体中文，语气友好、专业、简洁；2) 当前未接入系统内部知识库，请基于通用知识回答，不要编造本系统的具体库存数量、价格、借用人等数据；3) 涉及系统内具体数据或操作时，请引导用户在系统对应页面查询或办理。"
+        options:
+          model: ${AI_MODEL:gpt-4o-mini}
+          temperature: 0.7
 
 mybatis-plus:
   mapper-locations: classpath*:mapper/**/*.xml

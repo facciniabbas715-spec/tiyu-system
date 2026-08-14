@@ -166,3 +166,12 @@ npm run build
 - 配置：`application-dev.yml` 新增 `spring.data.redis`（`REDIS_HOST`/`REDIS_PORT`/`REDIS_PASSWORD`/`REDIS_DATABASE` 可覆盖）；新增根目录 `docker-compose.yml`（仅 `redis:7.4-alpine`，本地开发依赖，非部署配置）。
 - 测试：新增 `BusinessCacheTest` 6 例（命中回填、统一 Key、写后失效）；`StatisticTest.seed` 前置清汇总/热门缓存以保证 JDBC 直插断言；后端全量 73/73 通过。
 - 环境备注：dev 库残留的历史测试数据（分类 AB、器材 AB-2026-000001、用户 yze）已清理；与本次缓存改动无关。
+
+## 14. AI 智能客服（第一阶段，2026-08-14）
+
+1. **依赖**：引入 Spring AI 1.1.8（`spring-ai-bom` + `spring-ai-starter-model-openai`，官方对应 Spring Boot 3.5.x 版本线）；模型走 OpenAI 兼容协议，标准接口 `ChatModel` / `ChatClient`。
+2. **后端模块**：独立包 `com.company.sportseq.ai`（controller/service/config/dto/vo/exception），`POST /api/ai/chat` 权限 `ai:chat`，请求 `{message}`，响应 `Result<AiChatVO{content}>`。不修改任何器材业务代码。
+3. **配置**：`application.yml` 的 `spring.ai.openai.*`；`api-key` 只从环境变量 `AI_API_KEY` 读取（`AI_BASE_URL`/`AI_MODEL` 可选）。为让无 Key 时应用/测试仍能启动，`spring.ai.model.*=none` 关闭 starter 自动装配，由 `AiConfig` 条件构建 Bean；未配置时对话返回 3101 友好提示。
+4. **菜单**：Flyway V4 新增 `sys_menu` id=800（`/ai` → `ai/index`，perms `ai:chat`），并给 role_id=1 授权；其他角色在「角色管理」按需分配。
+5. **前端**：`src/api/ai.ts` + `src/views/ai/index.vue`（对话区/左右气泡/输入框/发送/Loading/清空），请求超时 60s。
+6. **测试**：新增 `AiChatTest`（桩模型验证接口/认证/参数/系统提示词）与 `AiChatNotConfiguredTest`（无 Key 友好降级）；全量后端 78/78、前端 type-check/build、冒烟 11 项、Playwright 实测「AI客服」页面均通过。

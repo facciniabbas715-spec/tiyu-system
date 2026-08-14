@@ -5,7 +5,7 @@
 ## 技术栈
 
 - 前端：Vue 3 + Vite + TypeScript + Element Plus + Pinia + Vue Router + Axios + ECharts
-- 后端：Spring Boot 3.5 + Spring Security（JWT + Redis）+ MyBatis-Plus + MySQL 8.0 + Flyway + EasyExcel
+- 后端：Spring Boot 3.5 + Spring Security（JWT + Redis）+ MyBatis-Plus + MySQL 8.0 + Flyway + EasyExcel + Spring AI（AI 智能客服）
 
 ## 目录结构
 
@@ -103,3 +103,23 @@ D:\Redis\redis-cli.exe GET "sportseq:equipment:detail:1"
 ```
 
 连接参数可用环境变量覆盖：`REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD`、`REDIS_DATABASE`。
+
+## AI 智能客服（第一阶段）
+
+侧边栏进入「AI客服」即可对话。当前为无状态单轮对话，暂未接入知识库（RAG 为下一阶段）。
+
+### 配置
+
+模型配置位于 `sportseq-admin/src/main/resources/application.yml` 的 `spring.ai.*` 段，走 OpenAI 兼容协议；**API Key 只能通过环境变量提供**，禁止写死或提交到 Git：
+
+```powershell
+$env:AI_API_KEY="sk-xxxx"                       # 必填，未配置时对话接口返回友好提示（code=3101）
+$env:AI_BASE_URL="https://api.openai.com"       # 可选，DeepSeek: https://api.deepseek.com；DashScope: https://dashscope.aliyuncs.com/compatible-mode/v1
+$env:AI_MODEL="gpt-4o-mini"                     # 可选，例如 deepseek-chat / qwen-plus
+```
+
+设置环境变量后重启后端，使用 `admin / admin123` 登录，在「AI客服」页输入问题即可。
+
+### 接口
+
+`POST /api/ai/chat`，请求 `{ "message": "篮球怎么借？" }`，响应 `{ "code": 0, "data": { "content": "..." } }`。
