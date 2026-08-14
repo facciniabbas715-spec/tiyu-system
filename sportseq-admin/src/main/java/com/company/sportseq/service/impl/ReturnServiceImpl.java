@@ -132,6 +132,7 @@ public class ReturnServiceImpl implements ReturnService {
         }
         order.setTotalQuantity(total);
         returnOrderMapper.updateById(order);
+        cacheService.evictAfterCommit(this::evictDashboardSummary);
     }
 
     private void insertReturnItem(Long returnId, ReturnItemDTO itemDto, BorrowItem borrowItem) {
@@ -271,6 +272,7 @@ public class ReturnServiceImpl implements ReturnService {
         update.setId(order.getId());
         update.setStatus(STATUS_REJECTED);
         returnOrderMapper.updateById(update);
+        cacheService.evictAfterCommit(this::evictDashboardSummary);
     }
 
     private int getQuantity(Long equipmentId, Long warehouseId) {
@@ -280,6 +282,10 @@ public class ReturnServiceImpl implements ReturnService {
 
     private void evictStockCaches() {
         cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
+    }
+
+    private void evictDashboardSummary() {
         cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 

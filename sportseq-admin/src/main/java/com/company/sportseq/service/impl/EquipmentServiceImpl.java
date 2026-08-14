@@ -105,6 +105,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         equipment.setStatus(dto.getStatus() == null ? 1 : dto.getStatus());
         equipmentMapper.insert(equipment);
         cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 
     @Override
@@ -121,6 +122,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         cacheService.evict(CacheConstants.equipmentDetailKey(dto.getId()));
         cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
         cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 
     @Override
@@ -149,6 +151,7 @@ public class EquipmentServiceImpl implements EquipmentService {
         cacheService.evict(CacheConstants.equipmentDetailKey(id));
         cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
         cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 
     @Override
@@ -221,6 +224,7 @@ public class EquipmentServiceImpl implements EquipmentService {
             }
         }
         cacheService.evictByPattern(CacheConstants.EQUIPMENT_LIST_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
         return new ImportResultVO(success, errors.size(), errors);
     }
 

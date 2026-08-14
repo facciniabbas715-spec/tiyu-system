@@ -116,6 +116,7 @@ public class ScrapServiceImpl implements ScrapService {
                     : equipment.getPurchasePrice().multiply(BigDecimal.valueOf(itemDto.getQuantity())));
             itemMapper.insert(item);
         }
+        cacheService.evictAfterCommit(this::evictDashboardSummary);
     }
 
     @Override
@@ -129,6 +130,7 @@ public class ScrapServiceImpl implements ScrapService {
         update.setAuditTime(LocalDateTime.now());
         update.setAuditRemark(dto.getRemark());
         orderMapper.updateById(update);
+        cacheService.evictAfterCommit(this::evictDashboardSummary);
     }
 
     @Override
@@ -182,6 +184,7 @@ public class ScrapServiceImpl implements ScrapService {
         update.setId(order.getId());
         update.setStatus(STATUS_CANCELED);
         orderMapper.updateById(update);
+        cacheService.evictAfterCommit(this::evictDashboardSummary);
     }
 
     private ScrapOrder getOrder(Long id) {
@@ -194,6 +197,10 @@ public class ScrapServiceImpl implements ScrapService {
 
     private void evictStockCaches() {
         cacheService.evictByPattern(CacheConstants.STOCK_PAGE_PATTERN);
+        cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
+    }
+
+    private void evictDashboardSummary() {
         cacheService.evict(CacheConstants.DASHBOARD_SUMMARY_KEY);
     }
 

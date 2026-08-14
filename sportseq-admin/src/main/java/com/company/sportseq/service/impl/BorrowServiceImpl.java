@@ -151,17 +151,23 @@ public class BorrowServiceImpl implements BorrowService {
         BorrowOrder order = getOrder(dto.getOrderId());
         checkDataScope(order);
         checkStatus(order, STATUS_PENDING, "待审核状态才能审核");
+        boolean reject = !Boolean.TRUE.equals(dto.getPass());
+        if (reject) {
+            // 前置删除：避免读者在数据库更新与缓存失效之间回填脏数据
+            evictStockCaches();
+        }
         Long userId = SecurityUtils.getUserId();
         BorrowOrder update = new BorrowOrder();
         update.setId(order.getId());
-        update.setStatus(Boolean.TRUE.equals(dto.getPass()) ? STATUS_APPROVED : STATUS_REJECTED);
+        update.setStatus(reject ? STATUS_REJECTED : STATUS_APPROVED);
         update.setAuditBy(userId);
         update.setAuditTime(LocalDateTime.now());
         update.setAuditRemark(dto.getRemark());
         orderMapper.updateById(update);
-        if (!Boolean.TRUE.equals(dto.getPass())) {
+        if (reject) {
             unlockItems(order.getId(), userId);
-            evictStockCaches();
+            // 二次删除：解锁完成后再次失效，覆盖并发读回填
+            cacheService.evictAfterCommit(this::evictStockCaches);
         }
     }
 
